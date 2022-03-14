@@ -18,46 +18,47 @@ a custom implementation of `SmtLib.Connection`.
 - Get the responses back with `SmtLib.Connection.receive_response/1`.
 - Close the connection with `SmtLib.Connection.close/1`.
 
-### Session
+### DSL
 
-The `SmtLib.Session` module offers an abstraction built on top 
-of the low level machinery which allows to execute commands and 
-get their responses in a synchronous way.
+The `SmtLib` module offers a DSL which translates in compile time
+to the low level machinery. It tries to be flexible enough to 
+support different use cases.
+
+This is an execution of single commands with
+their results gathered:
 
 ```elixir
-import SmtLib.Session
-alias SmtLib.Theory.Bool, as: B
+run(declare_const x: Bool)
+|> run(assert :x && !:x)
+|> run(check_sat)
+|> close()
 
-with_session(fn session ->
-  with {:ok, x} <- declare_const(session, "x", B.sort()),
-       :ok <- assert(session, B.conj(x, B.neg(x))),
-       {:ok, result} <- check_sat(session) do
-    result
-  else
-    err -> err
-  end
-end)
+# [:ok, :ok, {:ok, :unsat}]
+```
+
+This other one is the same but with error short-circuit:
+
+```elixir
+with {connection, :ok} <- run(declare_const x: Bool),
+     {connection, :ok} <- run(connection, assert(:x && !:x)),
+     {connection, {:ok, result}} <- run(connection, check_sat),
+     :ok <- close(connection) do
+  result
+end
 
 # :unsat
 ```
 
-### Script
-
-The `SmtLib.Script` module offers an abstraction, built also on 
-top of the low level machinery, which allows to group a sequence 
-of commands, run them and get all their responses back at once.
+And this last one shows how a block of commands is grouped
+into a sequence of commands to be executed in batch:
 
 ```elixir
-import SmtLib.Script
-alias SmtLib.Theory.Bool, as: B
-
-script = new()
-{script, x} = declare_const(script, "x", B.sort())
-
-script
-|> assert(B.conj(x, B.neg(x)))
-|> check_sat()
-|> run()
+run do
+  declare_const x: Bool
+  assert :x && !:x
+  check_sat
+end
+|> close()
 
 # [:ok, :ok, {:ok, :unsat}]
 ```

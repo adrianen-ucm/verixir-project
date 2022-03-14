@@ -1,10 +1,12 @@
+# TODO call this AST or rename dir structure to syntax
+
 defmodule SmtLib.Syntax do
   @moduledoc """
   SMT-LIB syntax as type definitions.
   """
 
+  @type symbol_t :: atom()
   @type string_t :: String.t()
-  @type symbol_t :: String.t()
   @type numeral_t :: non_neg_integer()
 
   @type constant_t ::

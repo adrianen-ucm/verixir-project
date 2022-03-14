@@ -88,7 +88,7 @@ defmodule SmtLib.String.From do
 
   @spec symbol(S.symbol_t()) :: String.t()
   def symbol(s) do
-    s
+    Atom.to_string(s)
   end
 
   @spec string(S.string_t()) :: String.t()

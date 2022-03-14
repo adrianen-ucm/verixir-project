@@ -1,28 +1,67 @@
 defmodule SmtLib do
   @moduledoc """
-  A set of required functions that an SMT-LIB command binding should
-  implement.
-
-  The return types are not specified because the provided implementations
-  take different approaches. See `SmtLib.Script` and `SmtLib.Session`.
+  A high level API for running SMT-LIB commands written in a DSL.
   """
 
-  alias SmtLib.Syntax, as: S
+  import SmtLib.Syntax.From
 
-  @typedoc false
-  @type implementation :: any()
+  @spec run(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro run(state \\ default_state(), ast) do
+    commands =
+      List.flatten(
+        case ast do
+          [do: {:__block__, _, asts}] -> Enum.map(asts, &command(&1))
+          ast -> [command(ast)]
+        end
+      )
 
-  @callback assert(implementation(), S.term_t()) :: any()
+    quote do
+      {connection, results} =
+        case unquote(state) do
+          {connection, results} -> {connection, List.wrap(results)}
+          connection -> {connection, []}
+        end
 
-  @callback check_sat(implementation()) :: any()
+      responses =
+        unquote(commands)
+        |> Enum.map(&SmtLib.Connection.send_command(connection, &1))
+        |> Enum.map(fn r ->
+          with :ok <- r,
+               {:ok, r} <- SmtLib.Connection.receive_response(connection) do
+            case r do
+              :success -> :ok
+              {:specific_success_response, {:check_sat_response, r}} -> {:ok, r}
+              other -> {:error, r}
+            end
+          end
+        end)
 
-  @callback push(implementation(), S.numeral_t()) :: any()
+      case results ++ responses do
+        [result] -> {connection, result}
+        results -> {connection, results}
+      end
+    end
+  end
 
-  @callback pop(implementation(), S.numeral_t()) :: any()
+  @spec close(Macro.t()) :: Macro.t()
+  defmacro close(state) do
+    quote do
+      case unquote(state) do
+        {connection, results} ->
+          SmtLib.Connection.close(connection)
+          results
 
-  @callback declare_const(implementation(), S.symbol_t(), S.sort_t()) :: any()
+        connection ->
+          SmtLib.Connection.close(connection)
+          :ok
+      end
+    end
+  end
 
-  @callback declare_sort(implementation(), S.symbol_t(), S.numeral_t()) :: any()
-
-  @callback declare_fun(implementation(), S.symbol_t(), [S.sort_t(), ...], S.sort_t()) :: any()
+  @spec default_state() :: Macro.t()
+  defp default_state() do
+    quote do
+      SmtLib.Connection.Z3.new()
+    end
+  end
 end

@@ -1,5 +1,3 @@
-# TODO call this AST or rename dir structure to syntax
-
 defmodule SmtLib.Syntax do
   @moduledoc """
   SMT-LIB syntax as type definitions.
@@ -50,4 +48,15 @@ defmodule SmtLib.Syntax do
           | :unsupported
           | {:error, string_t()}
           | {:specific_success_response, specific_success_response_t()}
+
+  @spec term_constants(term_t()) :: MapSet.t(constant_t())
+  @spec term_constants(term_t(), MapSet.t(constant_t())) :: MapSet.t(constant_t())
+  def term_constants(term, terms \\ MapSet.new()) do
+    case term do
+      {:constant, c} -> MapSet.put(terms, c)
+      {:identifier, _} -> terms
+      {:app, _, args} -> Enum.reduce(args, terms, &term_constants(&1, &2))
+      {:forall, _, term} -> term_constants(term, terms)
+    end
+  end
 end

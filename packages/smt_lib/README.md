@@ -5,15 +5,17 @@ and capabilities to also work with
 [other SMT-LIB interpreters](#other-smt-lib-interpreters).
 
 This is currently in early development stage, so a small subset of 
-SMT-LIB is supported and beaking changes can arise.
+SMT-LIB is supported and breaking changes can arise.
 
 ## Usage 
 
 ### Low level
 
 - Create a new connection with `SmtLib.Connection.Z3.new/1` or 
-a custom implementation of `SmtLib.Connection`.
-- Send commands as specified in `SmtLib.Syntax` through 
+a custom implementation of the 
+[`SmtLib.Connection`](./lib/smt_lib/connection.ex) protocol.
+- Send commands as specified in 
+[`SmtLib.Syntax`](./lib/smt_lib/syntax.ex) through 
 `SmtLib.Connection.send_command/2`.
 - Get the responses back with `SmtLib.Connection.receive_response/1`.
 - Close the connection with `SmtLib.Connection.close/1`.

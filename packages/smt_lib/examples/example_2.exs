@@ -7,8 +7,6 @@ run do
   declare_fun is_integer: Term :: Bool,
               integer_val: Term :: Int
 
-  # This yields to problems. Maybe it is better to generate
-  # the concrete asserts for the appearing literals.
   assert forall(
            :is_integer.(:x) && :integer_val.(:x) == :x,
            x: Int

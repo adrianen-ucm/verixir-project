@@ -1,9 +1,9 @@
-defmodule SmtLib.MixProject do
+defmodule Boogiex.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :smt_lib,
+      app: :boogiex,
       version: "0.1.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -16,7 +16,7 @@ defmodule SmtLib.MixProject do
 
   defp deps do
     [
-      {:nimble_parsec, "~> 1.0"},
+      {:smt_lib, in_umbrella: true},
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false}
     ]

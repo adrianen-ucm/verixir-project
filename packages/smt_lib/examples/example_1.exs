@@ -12,10 +12,9 @@ with {connection, :ok} <- run(declare_const x: Bool),
      {connection, :ok} <- run(connection, assert(:x && !:x)),
      {connection, {:ok, result}} <- run(connection, check_sat),
      :ok <- close(connection) do
-  IO.inspect(result)
-else
-  err -> IO.inspect(err)
+  result
 end
+|> IO.inspect()
 
 # Batch
 run do

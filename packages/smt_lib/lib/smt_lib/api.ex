@@ -1,15 +1,36 @@
 defmodule SmtLib.API do
+  @moduledoc """
+  An API for running SMT-LIB commands as specified in `SmtLib.Syntax`.
+  """
+
   alias SmtLib.Syntax, as: S
   alias SmtLib.Connection, as: C
 
-  @type state :: C.t() | {C.t(), result()}
+  @typedoc """
+  A state intended to be chained between `run/2` calls. It can be
+  either an `SmtLib.Connection` or a tuple with an `SmtLib.Connection`
+  and either a single `result` or a non empty list of them.
+  """
+  @type state :: C.t() | {C.t(), result() | [result(), ...]}
+
+  @typedoc """
+  The result of `run/2`.
+  """
   @type result ::
           :ok
           | {:ok, :sat | :unsat | :unknown}
           | {:error, term()}
 
-  @spec run_commands(state(), [S.command_t()]) :: state()
-  def run_commands(state, commands) do
+  @doc """
+  Runs the given SMT-LIB commands as specified in `SmtLib.Syntax` and returns an
+  `state` with the result or results.
+
+  It also requires a `state` which can be just an `SmtLib.Connection` or the `state`
+  produced by a previous `run/2` call. In this later case, the final `state` contains
+  also the result of the previous one.
+  """
+  @spec run(state(), [S.command_t()]) :: state()
+  def run(state, commands) do
     {connection, results} =
       case state do
         {connection, results} -> {connection, List.wrap(results)}
@@ -37,6 +58,10 @@ defmodule SmtLib.API do
     end
   end
 
+  @doc """
+  Takes a `state`, closes its underlying `SmtLib.Connection` and returns
+  the results.
+  """
   @spec close(state()) :: result()
   def close({connection, results}) do
     C.close(connection)

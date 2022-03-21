@@ -1,7 +1,7 @@
 defmodule Boogiex.Env do
-  alias Boogiex.Theory, as: T
+  alias Boogiex.Theory
+  alias SmtLib.Syntax.From
   alias SmtLib.Connection, as: C
-  alias SmtLib.Syntax.From, as: F
 
   @opaque t() :: %__MODULE__{connection: C.t()}
   defstruct [:connection]
@@ -10,9 +10,9 @@ defmodule Boogiex.Env do
   def new(connection) do
     env = %__MODULE__{connection: connection}
 
-    SmtLib.API.run_commands(
+    SmtLib.API.run(
       connection(env),
-      T.init() |> F.commands()
+      Theory.init() |> From.commands()
     )
 
     env

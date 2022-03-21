@@ -10,7 +10,8 @@ defmodule SmtLib.MixProject do
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
       elixir: "~> 1.13",
-      deps: deps()
+      deps: deps(),
+      docs: docs()
     ]
   end
 
@@ -19,6 +20,14 @@ defmodule SmtLib.MixProject do
       {:nimble_parsec, "~> 1.0"},
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false}
+    ]
+  end
+
+  defp docs do
+    [
+      extras: [
+        "README.md": [title: "Readme"]
+      ]
     ]
   end
 end

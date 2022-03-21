@@ -1,6 +1,6 @@
 defmodule SmtLib.Syntax do
   @moduledoc """
-  SMT-LIB syntax as type definitions.
+  SMT-LIB syntax specified as Elixir terms, and some utilities to manage them.
   """
 
   @type symbol_t :: atom()
@@ -49,14 +49,36 @@ defmodule SmtLib.Syntax do
           | {:error, string_t()}
           | {:specific_success_response, specific_success_response_t()}
 
+  @doc """
+  Returns a `MapSet` with the constant subterms of a given term.
+
+  ## Example
+
+  The following example uses also the module `SmtLib.Syntax.From`
+  in order to write the SMT-LIB term in Elixir syntax:
+
+      iex> SmtLib.Syntax.term_constants(
+      ...>   SmtLib.Syntax.From.term(quote do
+      ...>     forall :x * :x * :x == (1 + 2) * :x,
+      ...>       x: Bool
+      ...>     end
+      ...>   )
+      ...> )
+      MapSet.new([{:numeral, 1}, {:numeral, 2}])
+
+  """
   @spec term_constants(term_t()) :: MapSet.t(constant_t())
-  @spec term_constants(term_t(), MapSet.t(constant_t())) :: MapSet.t(constant_t())
-  def term_constants(term, terms \\ MapSet.new()) do
+  def term_constants(term) do
+    term_constants_rec(term, MapSet.new())
+  end
+
+  @spec term_constants_rec(term_t(), MapSet.t(constant_t())) :: MapSet.t(constant_t())
+  defp term_constants_rec(term, terms) do
     case term do
       {:constant, c} -> MapSet.put(terms, c)
       {:identifier, _} -> terms
-      {:app, _, args} -> Enum.reduce(args, terms, &term_constants(&1, &2))
-      {:forall, _, term} -> term_constants(term, terms)
+      {:app, _, args} -> Enum.reduce(args, terms, &term_constants_rec(&1, &2))
+      {:forall, _, term} -> term_constants_rec(term, terms)
     end
   end
 end

@@ -1,8 +1,9 @@
 defmodule Boogiex do
   require SmtLib
-  alias Boogiex.Env, as: E
-  alias Boogiex.Theory, as: T
-  alias SmtLib.Syntax.From, as: F
+  alias Boogiex.Env
+  alias Boogiex.Theory
+  alias SmtLib.Syntax.From
+  alias SmtLib.Connection.Z3, as: Default
 
   @spec with_env(Macro.t(), Macro.t()) :: Macro.t()
   defmacro with_env(env \\ default_env(), do: body) do
@@ -34,17 +35,16 @@ defmodule Boogiex do
         unquote(
           Macro.expand_once(
             quote do
-              SmtLib.run(
-                E.connection(env),
+              SmtLib.run Env.connection(env) do
                 declare_const([{unquote(name), Term}])
-              )
+              end
             end,
             __ENV__
           )
         )
 
       with {:error, e} <- result do
-        E.error(env, e)
+        Env.error(env, e)
       end
 
       result
@@ -60,17 +60,16 @@ defmodule Boogiex do
         unquote(
           Macro.expand_once(
             quote do
-              SmtLib.run(
-                E.connection(env),
-                assert(unquote(ast))
-              )
+              SmtLib.run Env.connection(env) do
+                assert unquote(ast)
+              end
             end,
             __ENV__
           )
         )
 
       with {:error, e} <- result do
-        E.error(unquote(env), e)
+        Env.error(unquote(env), e)
       end
 
       result
@@ -87,9 +86,9 @@ defmodule Boogiex do
         unquote(
           Macro.expand_once(
             quote do
-              SmtLib.run E.connection(env) do
+              SmtLib.run Env.connection(env) do
                 push
-                unquote(F.term(ast) |> T.for_term())
+                unquote(From.term(ast) |> Theory.for_term())
                 assert !unquote(ast)
                 check_sat
                 pop
@@ -108,7 +107,7 @@ defmodule Boogiex do
           _, errors -> errors
         end)
 
-      Enum.each(errors, &E.error(unquote(env), &1))
+      Enum.each(errors, &Env.error(unquote(env), &1))
 
       case errors do
         [] -> :ok
@@ -122,11 +121,11 @@ defmodule Boogiex do
     quote do
       case unquote(result) do
         {env, result} ->
-          Boogiex.Env.clear(env)
+          Env.clear(env)
           result
 
         env ->
-          Boogiex.Env.clear(env)
+          Env.clear(env)
           :ok
       end
     end
@@ -135,8 +134,8 @@ defmodule Boogiex do
   @spec default_env() :: Macro.t()
   defp default_env() do
     quote do
-      SmtLib.Connection.Z3.new()
-      |> Boogiex.Env.new()
+      Default.new()
+      |> Env.new()
     end
   end
 end

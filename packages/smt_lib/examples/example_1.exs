@@ -1,13 +1,13 @@
 import SmtLib
 
-# Command by command with result gathering
+# One command at a time with result gathering
 run(declare_const x: Bool)
 |> run(assert :x && !:x)
 |> run(check_sat)
 |> close()
 |> IO.inspect()
 
-# Command by command with error short-circuit
+# One command at a time with error short-circuit
 with {connection, :ok} <- run(declare_const x: Bool),
      {connection, :ok} <- run(connection, assert(:x && !:x)),
      {connection, {:ok, result}} <- run(connection, check_sat),

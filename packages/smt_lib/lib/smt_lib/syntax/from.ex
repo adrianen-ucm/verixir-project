@@ -7,7 +7,11 @@ defmodule SmtLib.Syntax.From do
   alias SmtLib.Syntax, as: S
 
   @spec command(Macro.t()) :: S.command_t()
-  def command({:check_sat, _, _}) do
+  def command({:check_sat, _, []}) do
+    :check_sat
+  end
+
+  def command({:check_sat, _, a}) when is_atom(a) do
     :check_sat
   end
 
@@ -62,16 +66,10 @@ defmodule SmtLib.Syntax.From do
   def command({:declare_fun, _, [[_ | _] = fs]}) do
     commands =
       for {f, {:"::", _, [ss, s]}} <- fs do
-        sort_args =
-          case ss do
-            {:__block__, _, sort_args} -> sort_args
-            sort_arg -> [sort_arg]
-          end
-
         {
           :declare_fun,
           symbol(f),
-          Enum.map(sort_args, &sort(&1)),
+          Enum.map(List.wrap(ss), &sort(&1)),
           sort(s)
         }
       end
@@ -156,7 +154,8 @@ defmodule SmtLib.Syntax.From do
     List.flatten(commands_rec(ast))
   end
 
-  @spec commands_rec(Macro.t()) :: [any()]
+  @spec commands_rec(Macro.t()) :: deep_command_list
+        when deep_command_list: [S.command_t() | deep_command_list]
   defp commands_rec(ast) do
     case ast do
       {:__block__, _, ast} -> commands_rec(ast)

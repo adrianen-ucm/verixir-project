@@ -25,6 +25,10 @@ defmodule SmtLib.String.From do
       {:declare_fun, s1, ss, s2} ->
         arg_sorts = Enum.map_join(ss, " ", &sort/1)
         "(declare-fun #{symbol(s1)} (#{arg_sorts}) #{sort(s2)})"
+
+      {:define_fun, s1, ss, s2, t} ->
+        arg_sorted_vars = Enum.map_join(ss, " ", &sorted_var/1)
+        "(define-fun #{symbol(s1)} (#{arg_sorted_vars}) #{sort(s2)} #{term(t)})"
     end
   end
 

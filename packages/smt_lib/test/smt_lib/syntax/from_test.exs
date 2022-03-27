@@ -108,6 +108,21 @@ defmodule SmtLib.Syntax.FromTest do
            ]
   end
 
+  test "Command define-fun" do
+    assert command(
+             quote do
+               define_fun example: [x: Bool] :: Bool <- :x != 3
+             end
+           ) == {
+             :define_fun,
+             :example,
+             [{:x, {:sort, {:simple, :Bool}}}],
+             {:sort, {:simple, :Bool}},
+             {:app, {:simple, :distinct},
+              [{:identifier, {:simple, :x}}, {:constant, {:numeral, 3}}]}
+           }
+  end
+
   test "Numeral" do
     assert numeral(
              quote do

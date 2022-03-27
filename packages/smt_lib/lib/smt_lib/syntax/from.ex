@@ -80,6 +80,24 @@ defmodule SmtLib.Syntax.From do
     end
   end
 
+  def command({:define_fun, _, [[_ | _] = fs]}) do
+    commands =
+      for {f, {:<-, _, [{:"::", _, [ss, s]}, t]}} <- fs do
+        {
+          :define_fun,
+          symbol(f),
+          Enum.map(List.wrap(ss), &sorted_var(&1)),
+          sort(s),
+          term(t)
+        }
+      end
+
+    case commands do
+      [command] -> command
+      commands -> commands
+    end
+  end
+
   @spec numeral(Macro.t()) :: S.numeral_t()
   def numeral(n) when is_integer(n) do
     n
@@ -149,6 +167,13 @@ defmodule SmtLib.Syntax.From do
     }
   end
 
+  def sorted_var({v, s}) do
+    {
+      symbol(v),
+      {:sort, {:simple, symbol(s)}}
+    }
+  end
+
   @spec commands(Macro.t()) :: [S.command_t()]
   def commands(ast) do
     List.flatten(commands_rec(ast))
@@ -172,6 +197,7 @@ defmodule SmtLib.Syntax.From do
     &&: :and,
     ||: :or,
     ==: :=,
+    <~>: :=,
     !=: :distinct,
     -: :-,
     +: :+,

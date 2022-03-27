@@ -6,7 +6,8 @@ locals_without_parens = [
   pop: 1,
   declare_const: 1,
   declare_sort: 1,
-  declare_fun: 1
+  declare_fun: 1,
+  define_fun: 1
 ]
 
 [

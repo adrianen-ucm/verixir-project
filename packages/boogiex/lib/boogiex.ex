@@ -1,9 +1,12 @@
 defmodule Boogiex do
-  require SmtLib
+  alias SmtLib.API
+  alias Boogiex.Exp
   alias Boogiex.Env
-  alias Boogiex.Theory
   alias SmtLib.Syntax.From
   alias SmtLib.Connection.Z3, as: Default
+
+  # TODO better error handling and pattern matching
+  # TODO refactor and reduce runtime overhead
 
   @spec with_env(Macro.t(), Macro.t()) :: Macro.t()
   defmacro with_env(env \\ default_env(), do: body) do
@@ -30,24 +33,19 @@ defmodule Boogiex do
   defmacro havoc(env, name) do
     quote do
       env = unquote(env)
+      term = unquote(Exp.exp(quote(do: env), name))
 
-      {_, result} =
-        unquote(
-          Macro.expand_once(
+      {_, :ok} =
+        API.run(
+          Env.connection(env),
+          From.commands(
             quote do
-              SmtLib.run Env.connection(env) do
-                declare_const([{unquote(name), Term}])
-              end
-            end,
-            __ENV__
+              declare_const [{unquote(term), Term}]
+            end
           )
         )
 
-      with {:error, e} <- result do
-        Env.error(env, e)
-      end
-
-      result
+      :ok
     end
   end
 
@@ -55,24 +53,31 @@ defmodule Boogiex do
   defmacro assume(env, ast) do
     quote do
       env = unquote(env)
+      term = unquote(Exp.exp(quote(do: env), ast))
 
-      {_, result} =
-        unquote(
-          Macro.expand_once(
+      {_, [:ok, :ok, {:ok, result}, :ok, :ok]} =
+        API.run(
+          Env.connection(env),
+          From.commands(
             quote do
-              SmtLib.run Env.connection(env) do
-                assert unquote(ast)
-              end
-            end,
-            __ENV__
+              push
+              assert !:is_boolean.(unquote(term))
+              check_sat
+              pop
+              assert :boolean_val.(unquote(term))
+            end
           )
         )
 
-      with {:error, e} <- result do
-        Env.error(unquote(env), e)
-      end
+      case result do
+        :unsat ->
+          :ok
 
-      result
+        _ ->
+          error = {:error, :assume_failed}
+          Env.error(env, error)
+          error
+      end
     end
   end
 
@@ -81,37 +86,40 @@ defmodule Boogiex do
   defmacro assert(env, ast, error_payload \\ :assert_failed) do
     quote do
       env = unquote(env)
+      term = unquote(Exp.exp(quote(do: env), ast))
 
-      {_, results} =
-        unquote(
-          Macro.expand_once(
-            quote do
-              SmtLib.run Env.connection(env) do
-                push
-                unquote(From.term(ast) |> Theory.for_term())
-                assert !unquote(ast)
-                check_sat
-                pop
-                assert unquote(ast)
-              end
-            end,
-            __ENV__
-          )
-        )
-
-      errors =
-        Enum.reduce(results, [], fn
-          {:error, e}, errors -> [e | errors]
-          {:ok, :sat}, errors -> [{:error, unquote(error_payload)} | errors]
-          {:ok, :unknown}, errors -> [{:error, unquote(error_payload)} | errors]
-          _, errors -> errors
-        end)
-
-      Enum.each(errors, &Env.error(unquote(env), &1))
-
-      case errors do
-        [] -> :ok
-        errors -> {:error, errors}
+      with {_, [:ok, :ok, {:ok, :unsat}, :ok]} <-
+             API.run(
+               Env.connection(env),
+               From.commands(
+                 quote do
+                   push
+                   assert !:is_boolean.(unquote(term))
+                   check_sat
+                   pop
+                 end
+               )
+             ),
+           # TODO shortcircuit or always continue?
+           {_, [:ok, :ok, {:ok, :unsat}, :ok, :ok]} <-
+             API.run(
+               Env.connection(env),
+               From.commands(
+                 quote do
+                   push
+                   assert !:boolean_val.(unquote(term))
+                   check_sat
+                   pop
+                   assert :boolean_val.(unquote(term))
+                 end
+               )
+             ) do
+        :ok
+      else
+        _ ->
+          error = {:error, unquote(error_payload)}
+          Env.error(env, error)
+          error
       end
     end
   end

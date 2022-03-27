@@ -34,6 +34,7 @@ defmodule SmtLib.Syntax do
           | {:declare_const, symbol_t(), sort_t()}
           | {:declare_sort, symbol_t(), numeral_t()}
           | {:declare_fun, symbol_t(), [sort_t()], sort_t()}
+          | {:define_fun, symbol_t(), [sorted_var_t()], sort_t(), term_t()}
 
   @type check_sat_response_t ::
           :sat

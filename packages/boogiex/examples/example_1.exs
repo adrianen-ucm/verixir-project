@@ -4,16 +4,17 @@ with_env do
   havoc x
   havoc result
 
-  assume integer(x)
+  assume is_integer(x)
 
-  assert integer(x)
-  assert integer(x)
-  assume integer(result)
+  assert is_integer(x)
+  assert is_integer(x)
+  assume is_integer(result)
+
   assume result == x + x
 
-  assert integer(result)
-  assert integer(2)
-  assert integer(x)
+  assert is_integer(result)
+  assert is_integer(2)
+  assert is_integer(x)
 
   with :ok <- assert(result == 2 * x, "Not verified") do
     IO.puts("Verified")

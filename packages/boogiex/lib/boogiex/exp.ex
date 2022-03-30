@@ -53,10 +53,10 @@ defmodule Boogiex.Exp do
   end
 
   def exp(env, literal) do
-    {is_type, type_val, type_lit, type_dec} =
+    {is_type, type_val, type_lit} =
       case literal do
-        literal when is_integer(literal) -> {:is_integer, :integer_val, :integer_lit, :integer}
-        literal when is_boolean(literal) -> {:is_boolean, :boolean_val, :boolean_lit, :boolean}
+        literal when is_integer(literal) -> {:is_integer, :integer_val, :integer_lit}
+        literal when is_boolean(literal) -> {:is_boolean, :boolean_val, :boolean_lit}
       end
 
     quote do
@@ -65,9 +65,8 @@ defmodule Boogiex.Exp do
       is_type = unquote(is_type)
       type_val = unquote(type_val)
       type_lit = unquote(type_lit)
-      type_dec = unquote(type_dec)
 
-      {_, [:ok, :ok, :ok, :ok]} =
+      {_, [:ok, :ok]} =
         API.run(
           Env.connection(env),
           From.commands(
@@ -76,9 +75,6 @@ defmodule Boogiex.Exp do
 
               assert unquote(type_val).(unquote(type_lit).(unquote(literal))) ==
                        unquote(literal)
-
-              assert :is_boolean.(unquote(type_dec).(unquote(type_lit).(unquote(literal))))
-              assert :boolean_val.(unquote(type_dec).(unquote(type_lit).(unquote(literal))))
             end
           )
         )

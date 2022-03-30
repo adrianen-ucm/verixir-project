@@ -24,8 +24,8 @@ defmodule Boogiex.Theory do
       declare_fun "_+_": [Term, Term] :: Term,
                   "_*_": [Term, Term] :: Term,
                   "_==_": [Term, Term] :: Term,
-                  integer: Term :: Term,
-                  boolean: Term :: Term
+                  is_integer_: Term :: Term,
+                  is_boolean_: Term :: Term
     end
   end
 
@@ -104,28 +104,30 @@ defmodule Boogiex.Theory do
      ]}
   end
 
-  def function(:integer) do
-    {:integer,
+  def function(:is_integer) do
+    {:is_integer_,
      [
        %Spec{
          pre: fn [_] -> true end,
          post: fn [x] ->
            quote do
-             :is_boolean.(:integer.(unquote(x))) && :is_integer.(unquote(x))
+             :is_boolean.(:is_integer_.(unquote(x))) &&
+               :boolean_val.(:is_integer_.(unquote(x))) <~> :is_integer.(unquote(x))
            end
          end
        }
      ]}
   end
 
-  def function(:boolean) do
-    {:boolean,
+  def function(:is_boolean) do
+    {:is_boolean_,
      [
        %Spec{
          pre: fn [_] -> true end,
          post: fn [x] ->
            quote do
-             :is_boolean.(:boolean.(unquote(x))) && :is_boolean.(unquote(x))
+             :is_boolean.(:is_boolean_.(unquote(x))) &&
+               :boolean_val.(:is_boolean_.(unquote(x))) <~> :is_boolean.(unquote(x))
            end
          end
        }

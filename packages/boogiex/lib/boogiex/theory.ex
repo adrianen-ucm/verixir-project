@@ -1,7 +1,8 @@
 defmodule Boogiex.Theory do
+  alias SmtLib.Syntax.From
   alias Boogiex.Theory.Spec
 
-  @spec init :: Macro.t()
+  @spec init :: From.ast()
   def init() do
     quote do
       declare_sort Term
@@ -41,9 +42,9 @@ defmodule Boogiex.Theory do
          end,
          post: fn [x, y] ->
            quote do
-             :integer_val.(:"_+_".(unquote(x), unquote(y))) ==
-               :integer_val.(unquote(x)) + :integer_val.(unquote(y)) &&
-               :is_integer.(:"_+_".(unquote(x), unquote(y)))
+             :is_integer.(:"_+_".(unquote(x), unquote(y))) &&
+               :integer_val.(:"_+_".(unquote(x), unquote(y))) ==
+                 :integer_val.(unquote(x)) + :integer_val.(unquote(y))
            end
          end
        }
@@ -61,9 +62,9 @@ defmodule Boogiex.Theory do
          end,
          post: fn [x, y] ->
            quote do
-             :integer_val.(:"_*_".(unquote(x), unquote(y))) ==
-               :integer_val.(unquote(x)) * :integer_val.(unquote(y)) &&
-               :is_integer.(:"_*_".(unquote(x), unquote(y)))
+             :is_integer.(:"_*_".(unquote(x), unquote(y))) &&
+               :integer_val.(:"_*_".(unquote(x), unquote(y))) ==
+                 :integer_val.(unquote(x)) * :integer_val.(unquote(y))
            end
          end
        }
@@ -81,9 +82,9 @@ defmodule Boogiex.Theory do
          end,
          post: fn [x, y] ->
            quote do
-             :boolean_val.(:"_==_".(unquote(x), unquote(y)))
-             <~> (:integer_val.(unquote(x)) == :integer_val.(unquote(y))) &&
-               :is_boolean.(:"_==_".(unquote(x), unquote(y)))
+             :is_boolean.(:"_==_".(unquote(x), unquote(y))) &&
+               :boolean_val.(:"_==_".(unquote(x), unquote(y))) ==
+                 (:integer_val.(unquote(x)) == :integer_val.(unquote(y)))
            end
          end
        },
@@ -95,9 +96,9 @@ defmodule Boogiex.Theory do
          end,
          post: fn [x, y] ->
            quote do
-             :boolean_val.(:"_==_".(unquote(x), unquote(y)))
-             <~> (:boolean_val.(unquote(x)) == :boolean_val.(unquote(y))) &&
-               :is_boolean.(:"_==_".(unquote(x), unquote(y)))
+             :is_boolean.(:"_==_".(unquote(x), unquote(y))) &&
+               :boolean_val.(:"_==_".(unquote(x), unquote(y))) ==
+                 (:boolean_val.(unquote(x)) == :boolean_val.(unquote(y)))
            end
          end
        }
@@ -112,7 +113,8 @@ defmodule Boogiex.Theory do
          post: fn [x] ->
            quote do
              :is_boolean.(:is_integer_.(unquote(x))) &&
-               :boolean_val.(:is_integer_.(unquote(x))) <~> :is_integer.(unquote(x))
+               :boolean_val.(:is_integer_.(unquote(x))) ==
+                 :is_integer.(unquote(x))
            end
          end
        }
@@ -127,7 +129,8 @@ defmodule Boogiex.Theory do
          post: fn [x] ->
            quote do
              :is_boolean.(:is_boolean_.(unquote(x))) &&
-               :boolean_val.(:is_boolean_.(unquote(x))) <~> :is_boolean.(unquote(x))
+               :boolean_val.(:is_boolean_.(unquote(x))) ==
+                 :is_boolean.(unquote(x))
            end
          end
        }

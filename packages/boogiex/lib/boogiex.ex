@@ -1,15 +1,25 @@
 defmodule Boogiex do
-  alias SmtLib.API
-  alias Boogiex.Exp
+  alias Boogiex.Stm
   alias Boogiex.Env
-  alias SmtLib.Syntax.From
+  alias Boogiex.Exp
   alias SmtLib.Connection.Z3, as: Default
 
-  # TODO better error handling and pattern matching
-  # TODO refactor and reduce runtime overhead
+  @type env :: Macro.t()
 
-  @spec with_env(Macro.t(), Macro.t()) :: Macro.t()
-  defmacro with_env(env \\ default_env(), do: body) do
+  @spec with_env(Macro.t()) :: Macro.t()
+  defmacro with_env(do: body) do
+    quote do
+      with_env(
+        Default.new()
+        |> Env.new(),
+        do: unquote(body)
+      )
+      |> clear()
+    end
+  end
+
+  @spec with_env(env(), Macro.t()) :: Macro.t()
+  defmacro with_env(env, do: body) do
     quote do
       env = unquote(env)
 
@@ -29,98 +39,35 @@ defmodule Boogiex do
     end
   end
 
-  @spec havoc(Macro.t(), Macro.t()) :: Macro.t()
-  defmacro havoc(env, name) do
+  @spec havoc(env(), Exp.ast()) :: Macro.t()
+  defmacro havoc(env, ast) do
     quote do
-      env = unquote(env)
-      term = unquote(Exp.exp(quote(do: env), name))
-
-      {_, :ok} =
-        API.run(
-          Env.connection(env),
-          From.commands(
-            quote do
-              declare_const [{unquote(term), Term}]
-            end
-          )
-        )
-
-      :ok
+      Stm.havoc(
+        unquote(env),
+        unquote(Macro.escape(ast))
+      )
     end
   end
 
-  @spec assume(Macro.t(), Macro.t()) :: Macro.t()
+  @spec assume(env(), Exp.ast()) :: Macro.t()
   defmacro assume(env, ast) do
     quote do
-      env = unquote(env)
-      term = unquote(Exp.exp(quote(do: env), ast))
-
-      {_, [:ok, :ok, {:ok, result}, :ok, :ok]} =
-        API.run(
-          Env.connection(env),
-          From.commands(
-            quote do
-              push
-              assert !:is_boolean.(unquote(term))
-              check_sat
-              pop
-              assert :boolean_val.(unquote(term))
-            end
-          )
-        )
-
-      case result do
-        :unsat ->
-          :ok
-
-        _ ->
-          error = {:error, :assume_failed}
-          Env.error(env, error)
-          error
-      end
+      Stm.assume(
+        unquote(env),
+        unquote(Macro.escape(ast))
+      )
     end
   end
 
-  @spec assert(Macro.t(), Macro.t()) :: Macro.t()
-  @spec assert(Macro.t(), Macro.t(), Macro.t()) :: Macro.t()
+  @spec assert(env(), Exp.ast()) :: Macro.t()
+  @spec assert(env(), Exp.ast(), Macro.t()) :: Macro.t()
   defmacro assert(env, ast, error_payload \\ :assert_failed) do
     quote do
-      env = unquote(env)
-      term = unquote(Exp.exp(quote(do: env), ast))
-
-      with {_, [:ok, :ok, {:ok, :unsat}, :ok]} <-
-             API.run(
-               Env.connection(env),
-               From.commands(
-                 quote do
-                   push
-                   assert !:is_boolean.(unquote(term))
-                   check_sat
-                   pop
-                 end
-               )
-             ),
-           # TODO shortcircuit or always continue?
-           {_, [:ok, :ok, {:ok, :unsat}, :ok, :ok]} <-
-             API.run(
-               Env.connection(env),
-               From.commands(
-                 quote do
-                   push
-                   assert !:boolean_val.(unquote(term))
-                   check_sat
-                   pop
-                   assert :boolean_val.(unquote(term))
-                 end
-               )
-             ) do
-        :ok
-      else
-        _ ->
-          error = {:error, unquote(error_payload)}
-          Env.error(env, error)
-          error
-      end
+      Stm.assert(
+        unquote(env),
+        unquote(Macro.escape(ast)),
+        unquote(error_payload)
+      )
     end
   end
 
@@ -136,14 +83,6 @@ defmodule Boogiex do
           Env.clear(env)
           :ok
       end
-    end
-  end
-
-  @spec default_env() :: Macro.t()
-  defp default_env() do
-    quote do
-      Default.new()
-      |> Env.new()
     end
   end
 end

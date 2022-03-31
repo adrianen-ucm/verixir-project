@@ -4,47 +4,44 @@ defmodule Boogiex.Exp do
   alias Boogiex.Theory
   alias SmtLib.Syntax.From
 
+  @type ast :: Macro.t()
+
   # TODO better error handling and pattern matching
-  # TODO refactor and reduce runtime overhead
 
-  @spec exp(Macro.t(), Macro.t()) :: {Macro.t(), Macro.t()}
+  @spec exp(Env.t(), ast()) :: From.ast()
   def exp(env, {fun_name, _, args}) when is_list(args) do
-    quote do
-      env = unquote(env)
-      terms = unquote(Enum.map(args, &exp(env, &1)))
-      fun_name = unquote(fun_name)
+    arg_terms = Enum.map(args, &exp(env, &1))
 
-      # TODO mock, get this through env
-      {corresponding_fun_name, fun_specs} = Theory.function(fun_name)
+    # TODO mock, get this through env
+    {corresponding_fun_name, fun_specs} = Theory.function(fun_name)
 
-      for spec <- fun_specs do
-        with {_, [:ok, :ok, {:ok, :unsat}, :ok]} <-
-               API.run(
-                 Env.connection(env),
-                 From.commands(
-                   quote do
-                     push
-                     assert !unquote(spec.pre.(terms))
-                     check_sat
-                     pop
-                   end
-                 )
-               ) do
-          {_, :ok} =
-            API.run(
-              Env.connection(env),
-              From.commands(
-                quote do
-                  assert unquote(spec.post.(terms))
-                end
-              )
+    for spec <- fun_specs do
+      with {_, [:ok, :ok, {:ok, :unsat}, :ok]} <-
+             API.run(
+               Env.connection(env),
+               From.commands(
+                 quote do
+                   push
+                   assert !unquote(spec.pre.(arg_terms))
+                   check_sat
+                   pop
+                 end
+               )
+             ) do
+        {_, :ok} =
+          API.run(
+            Env.connection(env),
+            From.commands(
+              quote do
+                assert unquote(spec.post.(arg_terms))
+              end
             )
-        end
+          )
       end
+    end
 
-      quote do
-        unquote(corresponding_fun_name).(unquote_splicing(terms))
-      end
+    quote do
+      unquote(corresponding_fun_name).(unquote_splicing(arg_terms))
     end
   end
 
@@ -59,29 +56,21 @@ defmodule Boogiex.Exp do
         literal when is_boolean(literal) -> {:is_boolean, :boolean_val, :boolean_lit}
       end
 
-    quote do
-      env = unquote(env)
-      literal = unquote(literal)
-      is_type = unquote(is_type)
-      type_val = unquote(type_val)
-      type_lit = unquote(type_lit)
+    {_, [:ok, :ok]} =
+      API.run(
+        Env.connection(env),
+        From.commands(
+          quote do
+            assert unquote(is_type).(unquote(type_lit).(unquote(literal)))
 
-      {_, [:ok, :ok]} =
-        API.run(
-          Env.connection(env),
-          From.commands(
-            quote do
-              assert unquote(is_type).(unquote(type_lit).(unquote(literal)))
-
-              assert unquote(type_val).(unquote(type_lit).(unquote(literal))) ==
-                       unquote(literal)
-            end
-          )
+            assert unquote(type_val).(unquote(type_lit).(unquote(literal))) ==
+                     unquote(literal)
+          end
         )
+      )
 
-      quote do
-        unquote(type_lit).(unquote(literal))
-      end
+    quote do
+      unquote(type_lit).(unquote(literal))
     end
   end
 end

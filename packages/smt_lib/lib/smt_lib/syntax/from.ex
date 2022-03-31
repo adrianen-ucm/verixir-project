@@ -6,7 +6,9 @@ defmodule SmtLib.Syntax.From do
 
   alias SmtLib.Syntax, as: S
 
-  @spec command(Macro.t()) :: S.command_t()
+  @type ast :: Macro.t()
+
+  @spec command(ast()) :: S.command_t()
   def command({:check_sat, _, []}) do
     :check_sat
   end
@@ -98,17 +100,17 @@ defmodule SmtLib.Syntax.From do
     end
   end
 
-  @spec numeral(Macro.t()) :: S.numeral_t()
+  @spec numeral(ast()) :: S.numeral_t()
   def numeral(n) when is_integer(n) do
     n
   end
 
-  @spec string(Macro.t()) :: S.string_t()
+  @spec string(ast()) :: S.string_t()
   def string(s) when is_bitstring(s) do
     s
   end
 
-  @spec symbol(Macro.t()) :: S.symbol_t()
+  @spec symbol(ast()) :: S.symbol_t()
   def symbol(s) when is_atom(s) do
     s
   end
@@ -117,12 +119,12 @@ defmodule SmtLib.Syntax.From do
     s
   end
 
-  @spec sort(Macro.t()) :: S.sort_t()
+  @spec sort(ast()) :: S.sort_t()
   def sort(s) do
     {:sort, {:simple, symbol(s)}}
   end
 
-  @spec term(Macro.t()) :: S.term_t()
+  @spec term(ast()) :: S.term_t()
   def term(s) when is_bitstring(s) do
     {:constant, {:string, string(s)}}
   end
@@ -159,7 +161,7 @@ defmodule SmtLib.Syntax.From do
     {:identifier, {:simple, symbol(v)}}
   end
 
-  @spec sorted_var(Macro.t()) :: S.sorted_var_t()
+  @spec sorted_var(ast()) :: S.sorted_var_t()
   def sorted_var({v, {:__aliases__, _, [s]}}) do
     {
       symbol(v),
@@ -174,12 +176,12 @@ defmodule SmtLib.Syntax.From do
     }
   end
 
-  @spec commands(Macro.t()) :: [S.command_t()]
+  @spec commands(ast()) :: [S.command_t()]
   def commands(ast) do
     List.flatten(commands_rec(ast))
   end
 
-  @spec commands_rec(Macro.t()) :: deep_command_list
+  @spec commands_rec(ast()) :: deep_command_list
         when deep_command_list: [S.command_t() | deep_command_list]
   defp commands_rec(ast) do
     case ast do

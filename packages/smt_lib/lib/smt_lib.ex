@@ -9,6 +9,8 @@ defmodule SmtLib do
   alias SmtLib.Syntax.From
   alias SmtLib.Connection.Z3, as: Default
 
+  @type state :: Macro.t()
+
   @doc """
   Runs SMT-LIB commands written in Elixir syntax as specified in
   `SmtLib.Syntax.From` and returns the result or results.
@@ -46,8 +48,8 @@ defmodule SmtLib do
       [:ok, :ok, {:ok, :sat}]
 
   """
-  @spec run(Macro.t()) :: Macro.t()
-  @spec run(Macro.t(), Macro.t()) :: Macro.t()
+  @spec run(From.ast()) :: Macro.t()
+  @spec run(state(), From.ast()) :: Macro.t()
   defmacro run(state \\ default_state(), ast) do
     quote do
       API.run(
@@ -68,14 +70,14 @@ defmodule SmtLib do
   See its usage in the `SmtLib.run/2` examples. This function is a
   counterpart for `SmtLib.API.close/1`.
   """
-  @spec close(Macro.t()) :: Macro.t()
+  @spec close(state()) :: Macro.t()
   defmacro close(state) do
     quote do
       API.close(unquote(state))
     end
   end
 
-  @spec default_state() :: Macro.t()
+  @spec default_state() :: state()
   defp default_state() do
     quote do
       Default.new()

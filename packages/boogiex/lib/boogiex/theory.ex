@@ -30,7 +30,20 @@ defmodule Boogiex.Theory do
     end
   end
 
-  @spec function(atom()) :: {atom(), [Spec.t()]}
+  @spec literal(term()) :: {atom(), atom(), atom()} | nil
+  def literal(n) when is_integer(n) do
+    {:is_integer, :integer_val, :integer_lit}
+  end
+
+  def literal(b) when is_boolean(b) do
+    {:is_boolean, :boolean_val, :boolean_lit}
+  end
+
+  def literal(_) do
+    nil
+  end
+
+  @spec function(atom()) :: {atom(), [Spec.t()]} | nil
   def function(:+) do
     {:"_+_",
      [
@@ -135,5 +148,9 @@ defmodule Boogiex.Theory do
          end
        }
      ]}
+  end
+
+  def function(_) do
+    nil
   end
 end

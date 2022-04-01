@@ -1,33 +1,38 @@
 defmodule Boogiex.Exp do
   alias SmtLib.API
   alias Boogiex.Env
-  alias Boogiex.Theory
   alias SmtLib.Syntax.From
 
   @type ast :: Macro.t()
 
-  # TODO better error handling and pattern matching
+  # TODO transform unmatched patterns into error data?
+  # I'm going to annotate errors which maybe should be reported
 
   @spec exp(Env.t(), ast()) :: From.ast()
   def exp(env, {fun_name, _, args}) when is_list(args) do
+    # TODO nested exp can report errors
     arg_terms = Enum.map(args, &exp(env, &1))
 
-    # TODO mock, get this through env
-    {corresponding_fun_name, fun_specs} = Theory.function(fun_name)
+    # TODO can be nil
+    {corresponding_fun_name, fun_specs} = Env.function(env, fun_name)
 
     for spec <- fun_specs do
-      with {_, [:ok, :ok, {:ok, :unsat}, :ok]} <-
-             API.run(
-               Env.connection(env),
-               From.commands(
-                 quote do
-                   push
-                   assert !unquote(spec.pre.(arg_terms))
-                   check_sat
-                   pop
-                 end
-               )
-             ) do
+      # TODO maybe the assert :ok is an error
+      {_, [:ok, :ok, {:ok, result}, :ok]} =
+        API.run(
+          Env.connection(env),
+          From.commands(
+            quote do
+              push
+              assert !unquote(spec.pre.(arg_terms))
+              check_sat
+              pop
+            end
+          )
+        )
+
+      with :unsat <- result do
+        # TODO maybe the assert :ok is an error
         {_, :ok} =
           API.run(
             Env.connection(env),
@@ -50,11 +55,8 @@ defmodule Boogiex.Exp do
   end
 
   def exp(env, literal) do
-    {is_type, type_val, type_lit} =
-      case literal do
-        literal when is_integer(literal) -> {:is_integer, :integer_val, :integer_lit}
-        literal when is_boolean(literal) -> {:is_boolean, :boolean_val, :boolean_lit}
-      end
+    # TODO can be nil
+    {is_type, type_val, type_lit} = Env.literal(env, literal)
 
     {_, [:ok, :ok]} =
       API.run(

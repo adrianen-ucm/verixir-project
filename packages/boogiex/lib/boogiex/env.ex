@@ -1,5 +1,6 @@
 defmodule Boogiex.Env do
   alias Boogiex.Theory
+  alias Boogiex.Theory.Spec
   alias SmtLib.Syntax.From
   alias SmtLib.Connection, as: C
 
@@ -30,8 +31,21 @@ defmodule Boogiex.Env do
     env.connection
   end
 
+  # TODO allow to customize?
   @spec error(t(), term()) :: nil
   def error(_, e) do
     IO.inspect(e)
+  end
+
+  # TODO allow to customize?
+  @spec function(t(), atom()) :: {atom(), [Spec.t()]} | nil
+  def function(_, name) do
+    Theory.function(name)
+  end
+
+  # TODO allow to customize?
+  @spec literal(t(), term()) :: {atom(), atom(), atom()} | nil
+  def literal(_, l) do
+    Theory.literal(l)
   end
 end

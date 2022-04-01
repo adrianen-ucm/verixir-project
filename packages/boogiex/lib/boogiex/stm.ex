@@ -4,10 +4,12 @@ defmodule Boogiex.Stm do
   alias Boogiex.Env
   alias SmtLib.Syntax.From
 
-  # TODO better error handling and pattern matching
+  # TODO transform unmatched patterns into error data?
+  # I'm going to annotate errors which maybe should be reported
 
-  @spec havoc(Env.t(), Exp.ast()) :: :ok
+  @spec havoc(Env.t(), Exp.ast()) :: :ok | {:error, term()}
   def havoc(env, ast) do
+    # TODO exp can report error
     term = Exp.exp(env, ast)
 
     {_, :ok} =
@@ -23,10 +25,11 @@ defmodule Boogiex.Stm do
     :ok
   end
 
-  @spec assume(Env.t(), Exp.ast()) :: :ok | {:error, :assume_failed}
+  @spec assume(Env.t(), Exp.ast()) :: :ok | {:error, term()}
   def assume(env, ast) do
     term = Exp.exp(env, ast)
 
+    # TODO maybe the asserts :ok are errors
     {_, [:ok, :ok, {:ok, result}, :ok, :ok]} =
       API.run(
         Env.connection(env),
@@ -56,34 +59,39 @@ defmodule Boogiex.Stm do
   def assert(env, ast, error_payload) do
     term = Exp.exp(env, ast)
 
-    with {_, [:ok, :ok, {:ok, :unsat}, :ok]} <-
-           API.run(
-             Env.connection(env),
-             From.commands(
-               quote do
-                 push
-                 assert !:is_boolean.(unquote(term))
-                 check_sat
-                 pop
-               end
-             )
-           ),
-         # TODO short-circuit or always continue?
-         {_, [:ok, :ok, {:ok, :unsat}, :ok, :ok]} <-
-           API.run(
-             Env.connection(env),
-             From.commands(
-               quote do
-                 push
-                 assert !:boolean_val.(unquote(term))
-                 check_sat
-                 pop
-                 assert :boolean_val.(unquote(term))
-               end
-             )
-           ) do
-      :ok
-    else
+    # TODO maybe the assert :ok are errors
+    {_, [:ok, :ok, {:ok, result1}, :ok]} =
+      API.run(
+        Env.connection(env),
+        From.commands(
+          quote do
+            push
+            assert !:is_boolean.(unquote(term))
+            check_sat
+            pop
+          end
+        )
+      )
+
+    # TODO maybe the asserts :ok are errors
+    {_, [:ok, :ok, {:ok, result2}, :ok, :ok]} =
+      API.run(
+        Env.connection(env),
+        From.commands(
+          quote do
+            push
+            assert !:boolean_val.(unquote(term))
+            check_sat
+            pop
+            assert :boolean_val.(unquote(term))
+          end
+        )
+      )
+
+    case {result1, result2} do
+      {:unsat, :unsat} ->
+        :ok
+
       _ ->
         error = {:error, error_payload}
         Env.error(env, error)

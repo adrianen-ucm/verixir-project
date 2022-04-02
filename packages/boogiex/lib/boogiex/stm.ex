@@ -3,16 +3,14 @@ defmodule Boogiex.Stm do
   alias Boogiex.Exp
   alias Boogiex.Env
   alias SmtLib.Syntax.From
+  alias Boogiex.Error.SmtError
 
-  # TODO transform unmatched patterns into error data?
-  # I'm going to annotate errors which maybe should be reported
-
+  # TODO refactor error handling in stm and exp
   @spec havoc(Env.t(), Exp.ast()) :: :ok | {:error, term()}
   def havoc(env, ast) do
-    # TODO exp can report error
     term = Exp.exp(env, ast)
 
-    {_, :ok} =
+    {_, declare_result} =
       API.run(
         Env.connection(env),
         From.commands(
@@ -22,15 +20,16 @@ defmodule Boogiex.Stm do
         )
       )
 
-    :ok
+    with {:error, e} <- declare_result do
+      raise SmtError, error: e
+    end
   end
 
   @spec assume(Env.t(), Exp.ast()) :: :ok | {:error, term()}
   def assume(env, ast) do
     term = Exp.exp(env, ast)
 
-    # TODO maybe the asserts :ok are errors
-    {_, [:ok, :ok, {:ok, result}, :ok, :ok]} =
+    {_, [push_result, assert_result_1, sat_result, pop_result, assert_result_2]} =
       API.run(
         Env.connection(env),
         From.commands(
@@ -44,14 +43,24 @@ defmodule Boogiex.Stm do
         )
       )
 
-    case result do
+    sat_result =
+      with :ok <- push_result,
+           :ok <- assert_result_1,
+           {:ok, sat_result} <- sat_result,
+           :ok <- pop_result,
+           :ok <- assert_result_2 do
+        sat_result
+      else
+        {:error, e} -> raise SmtError, error: e
+      end
+
+    case sat_result do
       :unsat ->
         :ok
 
       _ ->
-        error = {:error, :assume_failed}
-        Env.error(env, error)
-        error
+        Env.error(env, :assume_failed)
+        {:error, :assume_failed}
     end
   end
 
@@ -59,8 +68,7 @@ defmodule Boogiex.Stm do
   def assert(env, ast, error_payload) do
     term = Exp.exp(env, ast)
 
-    # TODO maybe the assert :ok are errors
-    {_, [:ok, :ok, {:ok, result1}, :ok]} =
+    {_, [push_result, assert_result, sat_result_1, pop_result]} =
       API.run(
         Env.connection(env),
         From.commands(
@@ -73,8 +81,17 @@ defmodule Boogiex.Stm do
         )
       )
 
-    # TODO maybe the asserts :ok are errors
-    {_, [:ok, :ok, {:ok, result2}, :ok, :ok]} =
+    sat_result_1 =
+      with :ok <- push_result,
+           :ok <- assert_result,
+           {:ok, sat_result_1} <- sat_result_1,
+           :ok <- pop_result do
+        sat_result_1
+      else
+        {:error, e} -> raise SmtError, error: e
+      end
+
+    {_, [push_result, assert_result_1, sat_result_2, pop_result, assert_result_2]} =
       API.run(
         Env.connection(env),
         From.commands(
@@ -88,14 +105,24 @@ defmodule Boogiex.Stm do
         )
       )
 
-    case {result1, result2} do
+    sat_result_2 =
+      with :ok <- push_result,
+           :ok <- assert_result_1,
+           {:ok, sat_result_2} <- sat_result_2,
+           :ok <- pop_result,
+           :ok <- assert_result_2 do
+        sat_result_2
+      else
+        {:error, e} -> raise SmtError, error: e
+      end
+
+    case {sat_result_1, sat_result_2} do
       {:unsat, :unsat} ->
         :ok
 
       _ ->
-        error = {:error, error_payload}
-        Env.error(env, error)
-        error
+        Env.error(env, error_payload)
+        {:error, error_payload}
     end
   end
 end

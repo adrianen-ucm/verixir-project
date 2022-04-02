@@ -2,23 +2,23 @@ defmodule Boogiex.Exp do
   alias SmtLib.API
   alias Boogiex.Env
   alias SmtLib.Syntax.From
+  alias Boogiex.Error.SmtError
+  alias Boogiex.Error.EnvError
 
   @type ast :: Macro.t()
 
-  # TODO transform unmatched patterns into error data?
-  # I'm going to annotate errors which maybe should be reported
-
+  # TODO refactor error handling
   @spec exp(Env.t(), ast()) :: From.ast()
   def exp(env, {fun_name, _, args}) when is_list(args) do
-    # TODO nested exp can report errors
     arg_terms = Enum.map(args, &exp(env, &1))
 
-    # TODO can be nil
-    {corresponding_fun_name, fun_specs} = Env.function(env, fun_name)
+    {corresponding_fun_name, fun_specs} =
+      with nil <- Env.function(env, fun_name) do
+        raise EnvError, message: "Undefined function #{fun_name}"
+      end
 
     for spec <- fun_specs do
-      # TODO maybe the assert :ok is an error
-      {_, [:ok, :ok, {:ok, result}, :ok]} =
+      {_, [push_result, assert_result, sat_result, pop_result]} =
         API.run(
           Env.connection(env),
           From.commands(
@@ -31,9 +31,18 @@ defmodule Boogiex.Exp do
           )
         )
 
-      with :unsat <- result do
-        # TODO maybe the assert :ok is an error
-        {_, :ok} =
+      sat_result =
+        with :ok <- push_result,
+             :ok <- assert_result,
+             {:ok, sat_result} <- sat_result,
+             :ok <- pop_result do
+          sat_result
+        else
+          {:error, e} -> raise SmtError, error: e
+        end
+
+      with :unsat <- sat_result do
+        {_, assert_result} =
           API.run(
             Env.connection(env),
             From.commands(
@@ -42,6 +51,10 @@ defmodule Boogiex.Exp do
               end
             )
           )
+
+        with {:error, e} <- assert_result do
+          raise SmtError, error: e
+        end
       end
     end
 
@@ -55,10 +68,12 @@ defmodule Boogiex.Exp do
   end
 
   def exp(env, literal) do
-    # TODO can be nil
-    {is_type, type_val, type_lit} = Env.literal(env, literal)
+    {is_type, type_val, type_lit} =
+      with nil <- Env.literal(env, literal) do
+        raise EnvError, message: "Unknown type for literal #{literal}"
+      end
 
-    {_, [:ok, :ok]} =
+    {_, [result_1, result_2]} =
       API.run(
         Env.connection(env),
         From.commands(
@@ -70,6 +85,12 @@ defmodule Boogiex.Exp do
           end
         )
       )
+
+    with :ok <- result_1,
+         :ok <- result_2 do
+    else
+      {:error, e} -> raise SmtError, error: e
+    end
 
     quote do
       unquote(type_lit).(unquote(literal))

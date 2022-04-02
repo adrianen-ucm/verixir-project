@@ -32,9 +32,15 @@ defmodule Boogiex.Env do
   end
 
   # TODO allow to customize?
-  @spec error(t(), term()) :: nil
+  @spec error(t(), term()) :: :ok
   def error(_, e) do
-    IO.inspect(e)
+    error_string =
+      case e do
+        string when is_bitstring(string) -> string
+        other -> inspect(other)
+      end
+
+    IO.puts(error_string)
   end
 
   # TODO allow to customize?

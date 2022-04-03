@@ -5,7 +5,6 @@ defmodule Boogiex.Stm do
   alias SmtLib.Syntax.From
   alias Boogiex.Error.SmtError
 
-  # TODO refactor error handling in stm and exp
   @spec havoc(Env.t(), Exp.ast()) :: :ok | {:error, term()}
   def havoc(env, ast) do
     term = Exp.exp(env, ast)

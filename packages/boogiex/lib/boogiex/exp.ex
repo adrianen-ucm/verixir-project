@@ -7,13 +7,12 @@ defmodule Boogiex.Exp do
 
   @type ast :: Macro.t()
 
-  # TODO refactor error handling
   @spec exp(Env.t(), ast()) :: From.ast()
   def exp(env, {fun_name, _, args}) when is_list(args) do
     arg_terms = Enum.map(args, &exp(env, &1))
 
     {corresponding_fun_name, fun_specs} =
-      with nil <- Env.function(env, fun_name) do
+      with nil <- Env.function(env, fun_name, length(arg_terms)) do
         raise EnvError, message: "Undefined function #{fun_name}"
       end
 

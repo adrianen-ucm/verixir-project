@@ -1,7 +1,8 @@
 defmodule Boogiex.Env do
   alias Boogiex.Theory
-  alias Boogiex.Theory.Spec
   alias SmtLib.Syntax.From
+  alias Boogiex.Theory.Spec
+  alias Boogiex.Error.SmtError
   alias SmtLib.Connection, as: C
 
   @opaque t() :: %__MODULE__{connection: C.t()}
@@ -11,10 +12,17 @@ defmodule Boogiex.Env do
   def new(connection) do
     env = %__MODULE__{connection: connection}
 
-    SmtLib.API.run(
-      connection(env),
-      Theory.init() |> From.commands()
-    )
+    {_, result} =
+      SmtLib.API.run(
+        connection(env),
+        Theory.init() |> From.commands()
+      )
+
+    for r <- List.wrap(result) do
+      with {:error, e} <- r do
+        raise SmtError, error: e
+      end
+    end
 
     env
   end
@@ -44,9 +52,9 @@ defmodule Boogiex.Env do
   end
 
   # TODO allow to customize?
-  @spec function(t(), atom()) :: {atom(), [Spec.t()]} | nil
-  def function(_, name) do
-    Theory.function(name)
+  @spec function(t(), atom(), non_neg_integer()) :: {atom(), [Spec.t()]} | nil
+  def function(_, name, arity) do
+    Theory.function(name, arity)
   end
 
   # TODO allow to customize?

@@ -20,7 +20,9 @@ defmodule Boogiex.Env do
 
     for r <- List.wrap(result) do
       with {:error, e} <- r do
-        raise SmtError, error: e
+        raise SmtError,
+          error: e,
+          context: "executing the Boogiex SMT-LIB initialization code"
       end
     end
 

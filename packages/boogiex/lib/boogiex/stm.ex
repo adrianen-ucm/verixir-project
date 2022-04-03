@@ -20,7 +20,9 @@ defmodule Boogiex.Stm do
       )
 
     with {:error, e} <- declare_result do
-      raise SmtError, error: e
+      raise SmtError,
+        error: e,
+        context: "declaring the variable #{Macro.to_string(ast)}"
     end
   end
 
@@ -50,7 +52,10 @@ defmodule Boogiex.Stm do
            :ok <- assert_result_2 do
         sat_result
       else
-        {:error, e} -> raise SmtError, error: e
+        {:error, e} ->
+          raise SmtError,
+            error: e,
+            context: "trying to assume #{Macro.to_string(ast)}"
       end
 
     case sat_result do
@@ -87,7 +92,10 @@ defmodule Boogiex.Stm do
            :ok <- pop_result do
         sat_result_1
       else
-        {:error, e} -> raise SmtError, error: e
+        {:error, e} ->
+          raise SmtError,
+            error: e,
+            context: "trying to assert #{Macro.to_string(ast)}"
       end
 
     {_, [push_result, assert_result_1, sat_result_2, pop_result, assert_result_2]} =
@@ -112,7 +120,10 @@ defmodule Boogiex.Stm do
            :ok <- assert_result_2 do
         sat_result_2
       else
-        {:error, e} -> raise SmtError, error: e
+        {:error, e} ->
+          raise SmtError,
+            error: e,
+            context: "trying to assert #{Macro.to_string(ast)}"
       end
 
     case {sat_result_1, sat_result_2} do

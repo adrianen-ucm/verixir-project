@@ -37,8 +37,8 @@ defmodule Boogiex.Theory do
                   term_neq: [Term, Term] :: Term,
                   term_not: [Term] :: Term,
                   term_neg: [Term] :: Term,
-                  is_integer_: Term :: Term,
-                  is_boolean_: Term :: Term
+                  term_is_integer: Term :: Term,
+                  term_is_boolean: Term :: Term
     end
   end
 
@@ -57,94 +57,94 @@ defmodule Boogiex.Theory do
 
   @spec function(atom(), non_neg_integer()) :: {atom(), [Spec.t()]} | nil
   def function(:+, 2) do
-    {:term_add, [Spec.binary_native(:term_add, :+, :is_integer, :integer_val)]}
+    {:term_add, [Spec.native(:term_add, :+, :is_integer, :integer_val)]}
   end
 
   def function(:-, 2) do
-    {:term_sub, [Spec.binary_native(:term_sub, :-, :is_integer, :integer_val)]}
+    {:term_sub, [Spec.native(:term_sub, :-, :is_integer, :integer_val)]}
   end
 
   def function(:*, 2) do
-    {:term_mul, [Spec.binary_native(:term_mul, :*, :is_integer, :integer_val)]}
+    {:term_mul, [Spec.native(:term_mul, :*, :is_integer, :integer_val)]}
   end
 
   def function(:>=, 2) do
     {:term_gte,
      [
-       Spec.binary_native(:term_gte, :>=, :is_integer, :integer_val, :is_boolean, :boolean_val)
+       Spec.native(:term_gte, :>=, :is_integer, :integer_val, :is_boolean, :boolean_val)
      ]}
   end
 
   def function(:>, 2) do
     {:term_gt,
      [
-       Spec.binary_native(:term_gt, :>, :is_integer, :integer_val, :is_boolean, :boolean_val)
+       Spec.native(:term_gt, :>, :is_integer, :integer_val, :is_boolean, :boolean_val)
      ]}
   end
 
   def function(:<=, 2) do
     {:term_lte,
      [
-       Spec.binary_native(:term_lte, :<=, :is_integer, :integer_val, :is_boolean, :boolean_val)
+       Spec.native(:term_lte, :<=, :is_integer, :integer_val, :is_boolean, :boolean_val)
      ]}
   end
 
   def function(:<, 2) do
     {:term_lt,
      [
-       Spec.binary_native(:term_lt, :<, :is_integer, :integer_val, :is_boolean, :boolean_val)
+       Spec.native(:term_lt, :<, :is_integer, :integer_val, :is_boolean, :boolean_val)
      ]}
   end
 
   def function(:&&, 2) do
-    {:term_and, [Spec.binary_native(:term_and, :&&, :is_boolean, :boolean_val)]}
+    {:term_and, [Spec.native(:term_and, :&&, :is_boolean, :boolean_val)]}
   end
 
   def function(:||, 2) do
-    {:term_or, [Spec.binary_native(:term_or, :||, :is_boolean, :boolean_val)]}
+    {:term_or, [Spec.native(:term_or, :||, :is_boolean, :boolean_val)]}
   end
 
   def function(:~>, 2) do
-    {:term_if, [Spec.binary_native(:term_if, :~>, :is_boolean, :boolean_val)]}
+    {:term_if, [Spec.native(:term_if, :~>, :is_boolean, :boolean_val)]}
   end
 
   def function(:<~>, 2) do
-    {:term_iff, [Spec.binary_native(:term_iff, :<~>, :is_boolean, :boolean_val)]}
+    {:term_iff, [Spec.native(:term_iff, :<~>, :is_boolean, :boolean_val)]}
   end
 
   def function(:==, 2) do
     {:term_eq,
      [
-       Spec.binary_native(:term_eq, :==, :is_boolean, :boolean_val),
-       Spec.binary_native(:term_eq, :==, :is_integer, :integer_val, :is_boolean, :boolean_val)
+       Spec.native(:term_eq, :==, :is_boolean, :boolean_val),
+       Spec.native(:term_eq, :==, :is_integer, :integer_val, :is_boolean, :boolean_val)
      ]}
   end
 
   def function(:!=, 2) do
     {:term_neq,
      [
-       Spec.binary_native(:term_neq, :!=, :is_boolean, :boolean_val),
-       Spec.binary_native(:term_neq, :!=, :is_integer, :integer_val, :is_boolean, :boolean_val)
+       Spec.native(:term_neq, :!=, :is_boolean, :boolean_val),
+       Spec.native(:term_neq, :!=, :is_integer, :integer_val, :is_boolean, :boolean_val)
      ]}
   end
 
   def function(:!, 1) do
-    {:term_not, [Spec.unary_native(:term_not, :!, :is_boolean, :boolean_val)]}
+    {:term_not, [Spec.native(:term_not, :!, :is_boolean, :boolean_val)]}
   end
 
   def function(:-, 1) do
-    {:term_neg, [Spec.unary_native(:term_neg, :-, :is_integer, :integer_val)]}
+    {:term_neg, [Spec.native(:term_neg, :-, :is_integer, :integer_val)]}
   end
 
   def function(:is_integer, 1) do
-    {:is_integer_,
+    {:term_is_integer,
      [
        %Spec{
          pre: fn [_] -> true end,
          post: fn [x] ->
            quote do
-             :is_boolean.(:is_integer_.(unquote(x))) &&
-               :boolean_val.(:is_integer_.(unquote(x))) ==
+             :is_boolean.(:term_is_integer.(unquote(x))) &&
+               :boolean_val.(:term_is_integer.(unquote(x))) ==
                  :is_integer.(unquote(x))
            end
          end
@@ -153,14 +153,14 @@ defmodule Boogiex.Theory do
   end
 
   def function(:is_boolean, 1) do
-    {:is_boolean_,
+    {:term_is_boolean,
      [
        %Spec{
          pre: fn [_] -> true end,
          post: fn [x] ->
            quote do
-             :is_boolean.(:is_boolean_.(unquote(x))) &&
-               :boolean_val.(:is_boolean_.(unquote(x))) ==
+             :is_boolean.(:term_is_boolean.(unquote(x))) &&
+               :boolean_val.(:term_is_boolean.(unquote(x))) ==
                  :is_boolean.(unquote(x))
            end
          end

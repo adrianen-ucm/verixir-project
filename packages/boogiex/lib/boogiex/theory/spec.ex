@@ -7,47 +7,53 @@ defmodule Boogiex.Theory.Spec do
         }
   defstruct [:pre, :post]
 
-  @spec unary_native(atom(), atom(), atom(), atom()) :: t()
-  def unary_native(uni, nat, is_type, type_val) do
-    unary_native(uni, nat, is_type, type_val, is_type, type_val)
+  @spec native(atom(), atom(), atom(), atom()) :: t()
+  def native(uni, nat, is_type, type_val) do
+    native(uni, nat, is_type, type_val, is_type, type_val)
   end
 
-  @spec binary_native(atom(), atom(), atom(), atom()) :: t()
-  def binary_native(uni, nat, is_type, type_val) do
-    binary_native(uni, nat, is_type, type_val, is_type, type_val)
-  end
-
-  @spec unary_native(atom(), atom(), atom(), atom(), atom(), atom()) :: t()
-  def unary_native(uni, nat, arg_is_type, arg_type_val, ret_is_type, ret_type_val) do
+  @spec native(atom(), atom(), atom(), atom(), atom(), atom()) :: t()
+  def native(uni, nat, arg_is_type, arg_type_val, ret_is_type, ret_type_val) do
     %__MODULE__{
-      pre: fn [x] ->
-        quote do
-          unquote(arg_is_type).(unquote(x))
-        end
-      end,
-      post: fn [x] ->
-        quote do
-          unquote(ret_is_type).(unquote(uni).(unquote(x))) &&
-            unquote(ret_type_val).(unquote(uni).(unquote(x))) ==
-              unquote(nat)(unquote(arg_type_val).(unquote(x)))
-        end
-      end
-    }
-  end
+      pre: fn args ->
+        empty_block =
+          quote do
+          end
 
-  @spec binary_native(atom(), atom(), atom(), atom(), atom(), atom()) :: t()
-  def binary_native(uni, nat, arg_is_type, arg_type_val, ret_is_type, ret_type_val) do
-    %__MODULE__{
-      pre: fn [x, y] ->
-        quote do
-          unquote(arg_is_type).(unquote(x)) && unquote(arg_is_type).(unquote(y))
-        end
+        Enum.reduce(args, empty_block, fn
+          arg, ^empty_block ->
+            quote do
+              unquote(arg_is_type).(unquote(arg))
+            end
+
+          arg, acc ->
+            quote do
+              unquote(acc) && unquote(arg_is_type).(unquote(arg))
+            end
+        end)
       end,
-      post: fn [x, y] ->
+      post: fn args ->
+        uni_app =
+          quote do
+            unquote(uni).(unquote_splicing(args))
+          end
+
+        nat_app =
+          quote do
+            unquote(nat)(
+              unquote_splicing(
+                for arg <- args do
+                  quote do
+                    unquote(arg_type_val).(unquote(arg))
+                  end
+                end
+              )
+            )
+          end
+
         quote do
-          unquote(ret_is_type).(unquote(uni).(unquote(x), unquote(y))) &&
-            unquote(ret_type_val).(unquote(uni).(unquote(x), unquote(y))) ==
-              unquote(nat)(unquote(arg_type_val).(unquote(x)), unquote(arg_type_val).(unquote(y)))
+          unquote(ret_is_type).(unquote(uni_app)) &&
+            unquote(ret_type_val).(unquote(uni_app)) == unquote(nat_app)
         end
       end
     }

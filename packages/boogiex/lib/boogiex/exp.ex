@@ -13,7 +13,11 @@ defmodule Boogiex.Exp do
 
     {corresponding_fun_name, fun_specs} =
       with nil <- Env.function(env, fun_name, length(arg_terms)) do
-        raise EnvError, message: "Undefined function #{fun_name}"
+        f = Atom.to_string(fun_name)
+        a = length(arg_terms)
+
+        raise EnvError,
+          message: "Unspecified function #{f}/#{a}"
       end
 
     for spec <- fun_specs do
@@ -37,7 +41,13 @@ defmodule Boogiex.Exp do
              :ok <- pop_result do
           sat_result
         else
-          {:error, e} -> raise SmtError, error: e
+          {:error, e} ->
+            f = Atom.to_string(fun_name)
+            a = length(arg_terms)
+
+            raise SmtError,
+              error: e,
+              context: "checking the #{f}/#{a} preconditions"
         end
 
       with :unsat <- sat_result do
@@ -52,7 +62,12 @@ defmodule Boogiex.Exp do
           )
 
         with {:error, e} <- assert_result do
-          raise SmtError, error: e
+          f = Atom.to_string(fun_name)
+          a = length(arg_terms)
+
+          raise SmtError,
+            error: e,
+            context: "checking the #{f}/#{a} postconditions"
         end
       end
     end
@@ -69,7 +84,8 @@ defmodule Boogiex.Exp do
   def exp(env, literal) do
     {is_type, type_val, type_lit} =
       with nil <- Env.literal(env, literal) do
-        raise EnvError, message: "Unknown type for literal #{literal}"
+        raise EnvError,
+          message: "Unknown type for literal #{Macro.to_string(literal)}"
       end
 
     {_, [result_1, result_2]} =
@@ -88,7 +104,10 @@ defmodule Boogiex.Exp do
     with :ok <- result_1,
          :ok <- result_2 do
     else
-      {:error, e} -> raise SmtError, error: e
+      {:error, e} ->
+        raise SmtError,
+          error: e,
+          context: "processing the literal #{Macro.to_string(literal)}"
     end
 
     quote do

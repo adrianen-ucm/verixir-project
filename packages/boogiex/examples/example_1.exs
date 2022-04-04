@@ -1,22 +1,11 @@
 import Boogiex
 
 with_env do
+  assert 2 == 1 + 1
+  assert false ~> true
+  assert 3 > 2 && 1 <= 1
+
   havoc x
-  havoc result
-
   assume is_integer(x)
-
-  assert is_integer(x)
-  assert is_integer(x)
-  assume is_integer(result)
-
-  assume result == x + x
-
-  assert is_integer(result)
-  assert is_integer(2)
-  assert is_integer(x)
-
-  with :ok <- assert(result == 2 * x, "Not verified") do
-    IO.puts("Verified")
-  end
+  assert (x == 2) <~> (x == 3 - 1)
 end

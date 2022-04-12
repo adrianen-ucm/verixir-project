@@ -96,23 +96,15 @@ defmodule Boogiex.Theory do
      ]}
   end
 
-  def function(:&&, 2) do
+  def function(:and, 2) do
     {:term_and, [Spec.native(:term_and, :&&, :is_boolean, :boolean_val)]}
   end
 
-  def function(:||, 2) do
+  def function(:or, 2) do
     {:term_or, [Spec.native(:term_or, :||, :is_boolean, :boolean_val)]}
   end
 
-  def function(:~>, 2) do
-    {:term_if, [Spec.native(:term_if, :~>, :is_boolean, :boolean_val)]}
-  end
-
-  def function(:<~>, 2) do
-    {:term_iff, [Spec.native(:term_iff, :<~>, :is_boolean, :boolean_val)]}
-  end
-
-  def function(:==, 2) do
+  def function(:===, 2) do
     {:term_eq,
      [
        Spec.native(:term_eq, :==, :is_boolean, :boolean_val),
@@ -120,7 +112,7 @@ defmodule Boogiex.Theory do
      ]}
   end
 
-  def function(:!=, 2) do
+  def function(:!==, 2) do
     {:term_neq,
      [
        Spec.native(:term_neq, :!=, :is_boolean, :boolean_val),
@@ -128,7 +120,7 @@ defmodule Boogiex.Theory do
      ]}
   end
 
-  def function(:!, 1) do
+  def function(:not, 1) do
     {:term_not, [Spec.native(:term_not, :!, :is_boolean, :boolean_val)]}
   end
 

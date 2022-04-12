@@ -51,23 +51,27 @@ defmodule Boogiex.Exp do
         end
 
       with :unsat <- sat_result do
-        {_, assert_result} =
+        {_, [assert_pre_result, assert_post_result]} =
           API.run(
             Env.connection(env),
             From.commands(
               quote do
+                assert unquote(spec.pre.(arg_terms))
                 assert unquote(spec.post.(arg_terms))
               end
             )
           )
 
-        with {:error, e} <- assert_result do
-          f = Atom.to_string(fun_name)
-          a = length(arg_terms)
+        with :ok <- assert_pre_result,
+             :ok <- assert_post_result do
+        else
+          {:error, e} ->
+            f = Atom.to_string(fun_name)
+            a = length(arg_terms)
 
-          raise SmtError,
-            error: e,
-            context: "checking the #{f}/#{a} postconditions"
+            raise SmtError,
+              error: e,
+              context: "checking the #{f}/#{a} postconditions"
         end
       end
     end

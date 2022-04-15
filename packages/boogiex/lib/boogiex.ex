@@ -30,6 +30,7 @@ defmodule Boogiex do
             {:assume, meta, [ast]} -> {:assume, meta, [quote(do: env), ast]}
             {:assert, meta, [ast]} -> {:assert, meta, [quote(do: env), ast]}
             {:assert, meta, [ast, error]} -> {:assert, meta, [quote(do: env), ast, error]}
+            {:block, meta, [body]} -> {:block, meta, [quote(do: env), body]}
             {:with_env, _, _} = nested -> Macro.expand_once(nested, __CALLER__)
             other -> other
           end)
@@ -67,6 +68,16 @@ defmodule Boogiex do
         unquote(env),
         unquote(Macro.escape(ast)),
         unquote(error_payload)
+      )
+    end
+  end
+
+  @spec block(env(), Macro.t()) :: Macro.t()
+  defmacro block(env, do: body) do
+    quote do
+      Stm.block(
+        unquote(env),
+        fn -> unquote(body) end
       )
     end
   end

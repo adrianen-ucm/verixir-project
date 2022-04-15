@@ -135,4 +135,43 @@ defmodule Boogiex.Stm do
         {:error, error_payload}
     end
   end
+
+  @spec block(Env.t(), (() -> any())) :: any()
+  def block(env, body) do
+    {_, push_result} =
+      API.run(
+        Env.connection(env),
+        From.commands(
+          quote do
+            push
+          end
+        )
+      )
+
+    with {:error, e} <- push_result do
+      raise SmtError,
+        error: e,
+        context: "evaluating a block"
+    end
+
+    result = body.()
+
+    {_, pop_result} =
+      API.run(
+        Env.connection(env),
+        From.commands(
+          quote do
+            pop
+          end
+        )
+      )
+
+    with {:error, e} <- pop_result do
+      raise SmtError,
+        error: e,
+        context: "evaluating a block"
+    end
+
+    result
+  end
 end

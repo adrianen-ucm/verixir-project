@@ -1,6 +1,8 @@
 defmodule Boogiex.Theory do
   alias SmtLib.Syntax.From
   alias Boogiex.Theory.Spec
+  alias Boogiex.Theory.LitType
+  alias Boogiex.Theory.Function
 
   @spec init :: From.ast()
   def init() do
@@ -40,466 +42,503 @@ defmodule Boogiex.Theory do
     end
   end
 
-  @spec literal(term()) :: {atom(), atom(), atom()} | nil
-  def literal(n) when is_integer(n) do
-    {:is_integer, :integer_val, :integer_lit}
+  @spec lit_type(term()) :: LitType.t() | nil
+  def lit_type(n) when is_integer(n) do
+    %LitType{
+      is_type: :is_integer,
+      type_val: :integer_val,
+      type_lit: :integer_lit
+    }
   end
 
-  def literal(b) when is_boolean(b) do
-    {:is_boolean, :boolean_val, :boolean_lit}
+  def lit_type(b) when is_boolean(b) do
+    %LitType{
+      is_type: :is_boolean,
+      type_val: :boolean_val,
+      type_lit: :boolean_lit
+    }
   end
 
-  def literal(_) do
+  def lit_type(_) do
     nil
   end
 
-  @spec function(atom(), non_neg_integer()) :: {atom(), [Spec.t()]} | nil
+  @spec function(atom(), non_neg_integer()) :: Function.t() | nil
   def function(:+, 2) do
-    {:term_add,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_integer.(:term_add.(unquote(x), unquote(y))) &&
-                 :integer_val.(:term_add.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(x)) + :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_add,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_integer.(:term_add.(unquote(x), unquote(y))) &&
+                  :integer_val.(:term_add.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(x)) + :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:-, 2) do
-    {:term_sub,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_integer.(:term_sub.(unquote(x), unquote(y))) &&
-                 :integer_val.(:term_sub.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(x)) - :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_sub,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_integer.(:term_sub.(unquote(x), unquote(y))) &&
+                  :integer_val.(:term_sub.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(x)) - :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:*, 2) do
-    {:term_mul,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_integer.(:term_mul.(unquote(x), unquote(y))) &&
-                 :integer_val.(:term_mul.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(x)) * :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_mul,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_integer.(:term_mul.(unquote(x), unquote(y))) &&
+                  :integer_val.(:term_mul.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(x)) * :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
-  # TODO mix boolean and integer comparison cases
   def function(:>=, 2) do
-    {:term_gte,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_gte.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_gte.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(x)) >= :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_gte,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_gte.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_gte.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(x)) >= :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:>, 2) do
-    {:term_gt,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_gt.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_gt.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(x)) > :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_gt,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_gt.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_gt.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(x)) > :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:<=, 2) do
-    {:term_lte,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_lte.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_lte.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(x)) <= :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_lte,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_lte.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_lte.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(x)) <= :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:<, 2) do
-    {:term_lt,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_lt.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_lt.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(x)) < :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_lt,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_lt.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_lt.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(x)) < :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:and, 2) do
-    {:term_and,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_boolean.(unquote(x)) && :is_boolean.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_and.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_and.(unquote(x), unquote(y))) ==
-                   (:boolean_val.(unquote(x)) && :boolean_val.(unquote(y)))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [x, _] ->
-           quote(do: :is_boolean.(unquote(x)) && !:boolean_val.(unquote(x)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_and.(unquote(x), unquote(y))) &&
-                 !:boolean_val.(:term_and.(unquote(x), unquote(y)))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(unquote(x)) &&
-                 :boolean_val.(unquote(x)) &&
-                 :is_boolean.(unquote(y))
-           )
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_and.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_and.(unquote(x), unquote(y))) ==
-                   :boolean_val.(unquote(y))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(unquote(x)) &&
-                 :boolean_val.(unquote(x)) &&
-                 :is_integer.(unquote(y))
-           )
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_integer.(:term_and.(unquote(x), unquote(y))) &&
-                 :integer_val.(:term_and.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_and,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_boolean.(unquote(x)) && :is_boolean.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_and.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_and.(unquote(x), unquote(y))) ==
+                    (:boolean_val.(unquote(x)) && :boolean_val.(unquote(y)))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [x, _] ->
+            quote(do: :is_boolean.(unquote(x)) && !:boolean_val.(unquote(x)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_and.(unquote(x), unquote(y))) &&
+                  !:boolean_val.(:term_and.(unquote(x), unquote(y)))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(unquote(x)) &&
+                  :boolean_val.(unquote(x)) &&
+                  :is_boolean.(unquote(y))
+            )
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_and.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_and.(unquote(x), unquote(y))) ==
+                    :boolean_val.(unquote(y))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(unquote(x)) &&
+                  :boolean_val.(unquote(x)) &&
+                  :is_integer.(unquote(y))
+            )
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_integer.(:term_and.(unquote(x), unquote(y))) &&
+                  :integer_val.(:term_and.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:or, 2) do
-    {:term_or,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_boolean.(unquote(x)) && :is_boolean.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_or.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_or.(unquote(x), unquote(y))) ==
-                   (:boolean_val.(unquote(x)) || :boolean_val.(unquote(y)))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [x, _] ->
-           quote(do: :is_boolean.(unquote(x)) && :boolean_val.(unquote(x)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_or.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_or.(unquote(x), unquote(y)))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(unquote(x)) &&
-                 !:boolean_val.(unquote(x)) &&
-                 :is_boolean.(unquote(y))
-           )
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(:term_or.(unquote(x), unquote(y))) &&
-                 :boolean_val.(:term_or.(unquote(x), unquote(y))) ==
-                   :boolean_val.(unquote(y))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [x, y] ->
-           quote(
-             do:
-               :is_boolean.(unquote(x)) &&
-                 !:boolean_val.(unquote(x)) &&
-                 :is_integer.(unquote(y))
-           )
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :is_integer.(:term_or.(unquote(x), unquote(y))) &&
-                 :integer_val.(:term_or.(unquote(x), unquote(y))) ==
-                   :integer_val.(unquote(y))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_or,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_boolean.(unquote(x)) && :is_boolean.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_or.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_or.(unquote(x), unquote(y))) ==
+                    (:boolean_val.(unquote(x)) || :boolean_val.(unquote(y)))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [x, _] ->
+            quote(do: :is_boolean.(unquote(x)) && :boolean_val.(unquote(x)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_or.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_or.(unquote(x), unquote(y)))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(unquote(x)) &&
+                  !:boolean_val.(unquote(x)) &&
+                  :is_boolean.(unquote(y))
+            )
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(:term_or.(unquote(x), unquote(y))) &&
+                  :boolean_val.(:term_or.(unquote(x), unquote(y))) ==
+                    :boolean_val.(unquote(y))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(
+              do:
+                :is_boolean.(unquote(x)) &&
+                  !:boolean_val.(unquote(x)) &&
+                  :is_integer.(unquote(y))
+            )
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :is_integer.(:term_or.(unquote(x), unquote(y))) &&
+                  :integer_val.(:term_or.(unquote(x), unquote(y))) ==
+                    :integer_val.(unquote(y))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:===, 2) do
-    {:term_eq,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :boolean_val.(:term_eq.(unquote(x), unquote(y))) ==
-                 (:integer_val.(unquote(x)) == :integer_val.(unquote(y)))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_boolean.(unquote(x)) && :is_boolean.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :boolean_val.(:term_eq.(unquote(x), unquote(y))) ==
-                 (:boolean_val.(unquote(x)) == :boolean_val.(unquote(y)))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [_, _] -> true end,
-         post: fn [x, y] ->
-           quote(do: :is_boolean.(:term_eq.(unquote(x), unquote(y))))
-         end
-       },
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: unquote(x) == unquote(y))
-         end,
-         post: fn [x, y] ->
-           quote(do: :boolean_val.(:term_eq.(unquote(x), unquote(y))))
-         end
-       },
-       %Spec{
-         pre: fn [_, _] -> true end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :boolean_val.(:term_eq.(unquote(x), unquote(y)))
-               ~> (:type.(unquote(x)) == :type.(unquote(y)))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_eq,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :boolean_val.(:term_eq.(unquote(x), unquote(y))) ==
+                  (:integer_val.(unquote(x)) == :integer_val.(unquote(y)))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_boolean.(unquote(x)) && :is_boolean.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :boolean_val.(:term_eq.(unquote(x), unquote(y))) ==
+                  (:boolean_val.(unquote(x)) == :boolean_val.(unquote(y)))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [_, _] -> true end,
+          post: fn [x, y] ->
+            quote(do: :is_boolean.(:term_eq.(unquote(x), unquote(y))))
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: unquote(x) == unquote(y))
+          end,
+          post: fn [x, y] ->
+            quote(do: :boolean_val.(:term_eq.(unquote(x), unquote(y))))
+          end
+        },
+        %Spec{
+          pre: fn [_, _] -> true end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :boolean_val.(:term_eq.(unquote(x), unquote(y)))
+                ~> (:type.(unquote(x)) == :type.(unquote(y)))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:!==, 2) do
-    {:term_neq,
-     [
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :boolean_val.(:term_neq.(unquote(x), unquote(y))) ==
-                 (:integer_val.(unquote(x)) != :integer_val.(unquote(y)))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: :is_boolean.(unquote(x)) && :is_boolean.(unquote(y)))
-         end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               :boolean_val.(:term_neq.(unquote(x), unquote(y))) ==
-                 (:boolean_val.(unquote(x)) != :boolean_val.(unquote(y)))
-           )
-         end
-       },
-       %Spec{
-         pre: fn [_, _] -> true end,
-         post: fn [x, y] ->
-           quote(do: :is_boolean.(:term_neq.(unquote(x), unquote(y))))
-         end
-       },
-       %Spec{
-         pre: fn [x, y] ->
-           quote(do: unquote(x) == unquote(y))
-         end,
-         post: fn [x, y] ->
-           quote(do: !:boolean_val.(:term_neq.(unquote(x), unquote(y))))
-         end
-       },
-       %Spec{
-         pre: fn [_, _] -> true end,
-         post: fn [x, y] ->
-           quote(
-             do:
-               !:boolean_val.(:term_neq.(unquote(x), unquote(y)))
-               ~> (:type.(unquote(x)) == :type.(unquote(y)))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_neq,
+      specs: [
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_integer.(unquote(x)) && :is_integer.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :boolean_val.(:term_neq.(unquote(x), unquote(y))) ==
+                  (:integer_val.(unquote(x)) != :integer_val.(unquote(y)))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: :is_boolean.(unquote(x)) && :is_boolean.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :boolean_val.(:term_neq.(unquote(x), unquote(y))) ==
+                  (:boolean_val.(unquote(x)) != :boolean_val.(unquote(y)))
+            )
+          end
+        },
+        %Spec{
+          pre: fn [_, _] -> true end,
+          post: fn [x, y] ->
+            quote(do: :is_boolean.(:term_neq.(unquote(x), unquote(y))))
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(do: unquote(x) == unquote(y))
+          end,
+          post: fn [x, y] ->
+            quote(do: !:boolean_val.(:term_neq.(unquote(x), unquote(y))))
+          end
+        },
+        %Spec{
+          pre: fn [_, _] -> true end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                !:boolean_val.(:term_neq.(unquote(x), unquote(y)))
+                ~> (:type.(unquote(x)) == :type.(unquote(y)))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:not, 1) do
-    {:term_not,
-     [
-       %Spec{
-         pre: fn [x] ->
-           quote(do: :is_boolean.(unquote(x)))
-         end,
-         post: fn [x] ->
-           quote(
-             do:
-               :is_boolean.(:term_not.(unquote(x))) &&
-                 :boolean_val.(:term_not.(unquote(x))) ==
-                   !:boolean_val.(unquote(x))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_not,
+      specs: [
+        %Spec{
+          pre: fn [x] ->
+            quote(do: :is_boolean.(unquote(x)))
+          end,
+          post: fn [x] ->
+            quote(
+              do:
+                :is_boolean.(:term_not.(unquote(x))) &&
+                  :boolean_val.(:term_not.(unquote(x))) ==
+                    !:boolean_val.(unquote(x))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:-, 1) do
-    {:term_neg,
-     [
-       %Spec{
-         pre: fn [x] ->
-           quote(do: :is_integer.(unquote(x)))
-         end,
-         post: fn [x] ->
-           quote(
-             do:
-               :is_integer.(:term_neg.(unquote(x))) &&
-                 :integer_val.(:term_neg.(unquote(x))) ==
-                   -:integer_val.(unquote(x))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_neg,
+      specs: [
+        %Spec{
+          pre: fn [x] ->
+            quote(do: :is_integer.(unquote(x)))
+          end,
+          post: fn [x] ->
+            quote(
+              do:
+                :is_integer.(:term_neg.(unquote(x))) &&
+                  :integer_val.(:term_neg.(unquote(x))) ==
+                    -:integer_val.(unquote(x))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:is_integer, 1) do
-    {:term_is_integer,
-     [
-       %Spec{
-         pre: fn [_] -> true end,
-         post: fn [x] ->
-           quote(
-             do:
-               :is_boolean.(:term_is_integer.(unquote(x))) &&
-                 :boolean_val.(:term_is_integer.(unquote(x))) ==
-                   :is_integer.(unquote(x))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_is_integer,
+      specs: [
+        %Spec{
+          pre: fn [_] -> true end,
+          post: fn [x] ->
+            quote(
+              do:
+                :is_boolean.(:term_is_integer.(unquote(x))) &&
+                  :boolean_val.(:term_is_integer.(unquote(x))) ==
+                    :is_integer.(unquote(x))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(:is_boolean, 1) do
-    {:term_is_boolean,
-     [
-       %Spec{
-         pre: fn [_] -> true end,
-         post: fn [x] ->
-           quote(
-             do:
-               :is_boolean.(:term_is_boolean.(unquote(x))) &&
-                 :boolean_val.(:term_is_boolean.(unquote(x))) ==
-                   :is_boolean.(unquote(x))
-           )
-         end
-       }
-     ]}
+    %Function{
+      name: :term_is_boolean,
+      specs: [
+        %Spec{
+          pre: fn [_] -> true end,
+          post: fn [x] ->
+            quote(
+              do:
+                :is_boolean.(:term_is_boolean.(unquote(x))) &&
+                  :boolean_val.(:term_is_boolean.(unquote(x))) ==
+                    :is_boolean.(unquote(x))
+            )
+          end
+        }
+      ]
+    }
   end
 
   def function(_, _) do

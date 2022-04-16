@@ -11,7 +11,7 @@ defmodule Boogiex.Exp do
   def exp(env, {fun_name, _, args}) when is_list(args) do
     arg_terms = Enum.map(args, &exp(env, &1))
 
-    {corresponding_fun_name, fun_specs} =
+    function =
       with nil <- Env.function(env, fun_name, length(arg_terms)) do
         f = Atom.to_string(fun_name)
         a = length(arg_terms)
@@ -20,7 +20,7 @@ defmodule Boogiex.Exp do
           message: "Unspecified function #{f}/#{a}"
       end
 
-    for spec <- fun_specs do
+    for spec <- function.specs do
       {_, [push_result, assert_result, sat_result, pop_result]} =
         API.run(
           Env.connection(env),
@@ -77,7 +77,7 @@ defmodule Boogiex.Exp do
     end
 
     quote do
-      unquote(corresponding_fun_name).(unquote_splicing(arg_terms))
+      unquote(function.name).(unquote_splicing(arg_terms))
     end
   end
 
@@ -86,8 +86,8 @@ defmodule Boogiex.Exp do
   end
 
   def exp(env, literal) do
-    {is_type, type_val, type_lit} =
-      with nil <- Env.literal(env, literal) do
+    lit_type =
+      with nil <- Env.lit_type(env, literal) do
         raise EnvError,
           message: "Unknown type for literal #{Macro.to_string(literal)}"
       end
@@ -97,9 +97,9 @@ defmodule Boogiex.Exp do
         Env.connection(env),
         From.commands(
           quote do
-            assert unquote(is_type).(unquote(type_lit).(unquote(literal)))
+            assert unquote(lit_type.is_type).(unquote(lit_type.type_lit).(unquote(literal)))
 
-            assert unquote(type_val).(unquote(type_lit).(unquote(literal))) ==
+            assert unquote(lit_type.type_val).(unquote(lit_type.type_lit).(unquote(literal))) ==
                      unquote(literal)
           end
         )
@@ -115,7 +115,7 @@ defmodule Boogiex.Exp do
     end
 
     quote do
-      unquote(type_lit).(unquote(literal))
+      unquote(lit_type.type_lit).(unquote(literal))
     end
   end
 end

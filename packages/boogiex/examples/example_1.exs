@@ -1,6 +1,9 @@
 import Boogiex
 
-with_env do
+with_local_env(
+  on_error: &IO.warn/1,
+  user_functions: MapSet.new([{:dup, 1}])
+) do
   assert 4 - 2 === 6 - 4
 
   assert 2 === 1 + 1
@@ -30,4 +33,11 @@ with_env do
   assume a === b
   assume b === c
   assert a === c
+
+  havoc d
+  assume is_integer(d)
+  # alternative: store the body and do unfold(dup(d))
+  define dup(d), as: d + d
+  assert is_integer(dup(d))
+  assert dup(d) === 2 * d
 end

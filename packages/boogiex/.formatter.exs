@@ -3,7 +3,9 @@ locals_without_parens = [
   havoc: 1,
   assume: 1,
   assert: 1,
-  assert: 2
+  assert: 2,
+  block: 1,
+  define: 2
 ]
 
 [

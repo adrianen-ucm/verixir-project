@@ -1,17 +1,30 @@
 defmodule Boogiex.Env do
   alias Boogiex.Theory
+  alias SmtLib.Connection
+  alias Boogiex.Env.Config
   alias SmtLib.Syntax.From
   alias Boogiex.Theory.LitType
-  alias Boogiex.Theory.Function
   alias Boogiex.Error.SmtError
-  alias SmtLib.Connection, as: C
+  alias Boogiex.Theory.Function
 
-  @opaque t() :: %__MODULE__{connection: C.t()}
-  defstruct [:connection]
+  @opaque t() :: %__MODULE__{
+            connection: Connection.t(),
+            config: Config.t()
+          }
+  defstruct [:connection, :config]
 
-  @spec new(C.t()) :: t()
-  def new(connection) do
-    env = %__MODULE__{connection: connection}
+  @spec new(Connection.t(), Config.t()) :: t()
+  def new(connection, config) do
+    config =
+      Keyword.merge(
+        Config.default(),
+        config
+      )
+
+    env = %__MODULE__{
+      connection: connection,
+      config: config
+    }
 
     {_, result} =
       SmtLib.API.run(
@@ -27,6 +40,24 @@ defmodule Boogiex.Env do
       end
     end
 
+    {_, result} =
+      SmtLib.API.run(
+        connection(env),
+        config[:user_functions]
+        |> Enum.map(fn {name, arity} ->
+          Theory.declare_function(name, arity)
+        end)
+        |> From.commands()
+      )
+
+    for r <- List.wrap(result) do
+      with {:error, e} <- r do
+        raise SmtError,
+          error: e,
+          context: "declaring the user defined SMT-LIB functions"
+      end
+    end
+
     env
   end
 
@@ -34,7 +65,7 @@ defmodule Boogiex.Env do
   def clear(env) do
     env
     |> connection()
-    |> C.close()
+    |> Connection.close()
   end
 
   @spec connection(t()) :: SmtLib.Connection
@@ -42,25 +73,18 @@ defmodule Boogiex.Env do
     env.connection
   end
 
-  # TODO allow to customize?
   @spec error(t(), term()) :: :ok
-  def error(_, e) do
-    error_string =
-      case e do
-        string when is_bitstring(string) -> string
-        other -> inspect(other)
-      end
-
-    IO.puts(error_string)
+  def error(env, e) do
+    env.config[:on_error].(e)
   end
 
-  # TODO allow to customize?
   @spec function(t(), atom(), non_neg_integer()) :: Function.t() | nil
-  def function(_, name, arity) do
-    Theory.function(name, arity)
+  def function(env, name, arity) do
+    with nil <- Theory.function(name, arity) do
+      Config.function(env.config, name, arity)
+    end
   end
 
-  # TODO allow to customize?
   @spec lit_type(t(), term()) :: LitType.t() | nil
   def lit_type(_, l) do
     Theory.lit_type(l)

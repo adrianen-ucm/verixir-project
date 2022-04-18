@@ -1,6 +1,6 @@
 import Boogiex
 
-with_env do
+with_local_env do
   havoc x
   havoc result
 

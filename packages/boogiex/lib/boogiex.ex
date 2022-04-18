@@ -5,13 +5,14 @@ defmodule Boogiex do
   alias SmtLib.Connection.Z3, as: Default
 
   @type env :: Macro.t()
+  @type config :: Macro.t()
 
-  @spec with_env(Macro.t()) :: Macro.t()
-  defmacro with_env(do: body) do
+  @spec with_local_env(config(), Macro.t()) :: Macro.t()
+  defmacro with_local_env(config \\ [], do: body) do
     quote do
       with_env(
         Default.new()
-        |> Env.new(),
+        |> Env.new(unquote(config)),
         do: unquote(body)
       )
       |> clear()
@@ -31,6 +32,7 @@ defmodule Boogiex do
             {:assert, meta, [ast]} -> {:assert, meta, [quote(do: env), ast]}
             {:assert, meta, [ast, error]} -> {:assert, meta, [quote(do: env), ast, error]}
             {:block, meta, [body]} -> {:block, meta, [quote(do: env), body]}
+            {:define, meta, [e1, e2]} -> {:define, meta, [quote(do: env), e1, e2]}
             {:with_env, _, _} = nested -> Macro.expand_once(nested, __CALLER__)
             other -> other
           end)
@@ -78,6 +80,17 @@ defmodule Boogiex do
       Stm.block(
         unquote(env),
         fn -> unquote(body) end
+      )
+    end
+  end
+
+  @spec define(env(), Macro.t(), Macro.t()) :: Macro.t()
+  defmacro define(env, e1, as: e2) do
+    quote do
+      Stm.define(
+        unquote(env),
+        unquote(Macro.escape(e1)),
+        unquote(Macro.escape(e2))
       )
     end
   end

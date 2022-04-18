@@ -63,6 +63,19 @@ defmodule Boogiex.Theory do
     nil
   end
 
+  @spec declare_function(atom(), non_neg_integer()) :: From.ast()
+  def declare_function(name, arity) do
+    quote(
+      do:
+        declare_fun([
+          {
+            unquote(name),
+            [unquote_splicing(List.duplicate(:Term, arity))] :: Term
+          }
+        ])
+    )
+  end
+
   @spec function(atom(), non_neg_integer()) :: Function.t() | nil
   def function(:+, 2) do
     %Function{

@@ -174,4 +174,26 @@ defmodule Boogiex.Stm do
 
     result
   end
+
+  @spec define(Env.t(), Exp.ast(), Exp.ast()) :: :ok | {:error, term()}
+  def define(env, e1, e2) do
+    t1 = Exp.exp(env, e1)
+    t2 = Exp.exp(env, e2)
+
+    {_, assert_result} =
+      API.run(
+        Env.connection(env),
+        From.commands(
+          quote do
+            assert unquote(t1) == unquote(t2)
+          end
+        )
+      )
+
+    with {:error, e} <- assert_result do
+      raise SmtError,
+        error: e,
+        context: "defining #{Macro.to_string(e2)} as #{Macro.to_string(e1)}"
+    end
+  end
 end

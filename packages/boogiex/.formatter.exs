@@ -5,7 +5,8 @@ locals_without_parens = [
   assert: 1,
   assert: 2,
   block: 1,
-  define: 2
+  same: 2,
+  unfold: 1
 ]
 
 [

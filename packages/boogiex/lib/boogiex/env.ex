@@ -6,6 +6,7 @@ defmodule Boogiex.Env do
   alias Boogiex.Theory.LitType
   alias Boogiex.Error.SmtError
   alias Boogiex.Theory.Function
+  alias Boogiex.Env.UserFunction
 
   @opaque t() :: %__MODULE__{
             connection: Connection.t(),
@@ -13,13 +14,9 @@ defmodule Boogiex.Env do
           }
   defstruct [:connection, :config]
 
-  @spec new(Connection.t(), Config.t()) :: t()
-  def new(connection, config) do
-    config =
-      Keyword.merge(
-        Config.default(),
-        config
-      )
+  @spec new(Connection.t(), Config.params()) :: t()
+  def new(connection, params) do
+    config = Config.new(params)
 
     env = %__MODULE__{
       connection: connection,
@@ -28,7 +25,7 @@ defmodule Boogiex.Env do
 
     {_, result} =
       SmtLib.API.run(
-        connection(env),
+        connection,
         Theory.init() |> From.commands()
       )
 
@@ -42,8 +39,9 @@ defmodule Boogiex.Env do
 
     {_, result} =
       SmtLib.API.run(
-        connection(env),
-        config[:user_functions]
+        connection,
+        config
+        |> Config.user_functions()
         |> Enum.map(fn {name, arity} ->
           Theory.declare_function(name, arity)
         end)
@@ -54,7 +52,7 @@ defmodule Boogiex.Env do
       with {:error, e} <- r do
         raise SmtError,
           error: e,
-          context: "declaring the user defined SMT-LIB functions"
+          context: "declaring the user defined functions"
       end
     end
 
@@ -75,18 +73,27 @@ defmodule Boogiex.Env do
 
   @spec error(t(), term()) :: :ok
   def error(env, e) do
-    env.config[:on_error].(e)
-  end
-
-  @spec function(t(), atom(), non_neg_integer()) :: Function.t() | nil
-  def function(env, name, arity) do
-    with nil <- Theory.function(name, arity) do
-      Config.function(env.config, name, arity)
-    end
+    env.config.on_error.(e)
   end
 
   @spec lit_type(t(), term()) :: LitType.t() | nil
   def lit_type(_, l) do
     Theory.lit_type(l)
+  end
+
+  @spec function(t(), atom(), non_neg_integer()) :: Function.t() | nil
+  def function(env, name, arity) do
+    with nil <- Theory.function(name, arity) do
+      with nil <- Config.user_function(env.config, name, arity) do
+        nil
+      else
+        f -> %Function{name: f.name}
+      end
+    end
+  end
+
+  @spec user_function(t(), atom(), non_neg_integer()) :: UserFunction.t() | nil
+  def user_function(env, name, arity) do
+    Config.user_function(env.config, name, arity)
   end
 end

@@ -22,5 +22,8 @@ erl_crash.dump
 # Temporary files, for example, from tests.
 /tmp/
 
+# Language server directory.
+/.elixir_ls/
+
 # OS files
 .DS_Store

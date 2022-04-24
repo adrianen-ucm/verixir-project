@@ -32,7 +32,8 @@ defmodule Boogiex do
             {:assert, meta, [ast]} -> {:assert, meta, [quote(do: env), ast]}
             {:assert, meta, [ast, error]} -> {:assert, meta, [quote(do: env), ast, error]}
             {:block, meta, [body]} -> {:block, meta, [quote(do: env), body]}
-            {:define, meta, [e1, e2]} -> {:define, meta, [quote(do: env), e1, e2]}
+            {:same, meta, [ast1, ast2]} -> {:same, meta, [quote(do: env), ast1, ast2]}
+            {:unfold, meta, [ast]} -> {:unfold, meta, [quote(do: env), ast]}
             {:with_env, _, _} = nested -> Macro.expand_once(nested, __CALLER__)
             other -> other
           end)
@@ -84,13 +85,24 @@ defmodule Boogiex do
     end
   end
 
-  @spec define(env(), Macro.t(), Macro.t()) :: Macro.t()
-  defmacro define(env, e1, as: e2) do
+  @spec same(env(), Macro.t(), Macro.t()) :: Macro.t()
+  defmacro same(env, e1, than: e2) do
     quote do
-      Stm.define(
+      Stm.same(
         unquote(env),
         unquote(Macro.escape(e1)),
         unquote(Macro.escape(e2))
+      )
+    end
+  end
+
+  @spec unfold(env(), Macro.t()) :: Macro.t()
+  defmacro unfold(env, {f, _, args}) do
+    quote do
+      Stm.unfold(
+        unquote(env),
+        unquote(Macro.escape(f)),
+        unquote(Macro.escape(args))
       )
     end
   end

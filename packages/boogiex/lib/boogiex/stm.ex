@@ -4,6 +4,7 @@ defmodule Boogiex.Stm do
   alias Boogiex.Env
   alias SmtLib.Syntax.From
   alias Boogiex.Error.SmtError
+  alias Boogiex.Error.EnvError
 
   @spec havoc(Env.t(), Exp.ast()) :: :ok | {:error, term()}
   def havoc(env, ast) do
@@ -175,8 +176,8 @@ defmodule Boogiex.Stm do
     result
   end
 
-  @spec define(Env.t(), Exp.ast(), Exp.ast()) :: :ok | {:error, term()}
-  def define(env, e1, e2) do
+  @spec same(Env.t(), Exp.ast(), Exp.ast()) :: :ok | {:error, term()}
+  def same(env, e1, e2) do
     t1 = Exp.exp(env, e1)
     t2 = Exp.exp(env, e2)
 
@@ -195,5 +196,39 @@ defmodule Boogiex.Stm do
         error: e,
         context: "defining #{Macro.to_string(e2)} as #{Macro.to_string(e1)}"
     end
+  end
+
+  @spec unfold(Env.t(), atom(), [Exp.ast()]) :: :ok | {:error, term()}
+  def unfold(env, fun_name, args) do
+    user_function =
+      with nil <- Env.user_function(env, fun_name, length(args)) do
+        f = Atom.to_string(fun_name)
+        a = length(args)
+
+        raise EnvError,
+          message: "Undefined user function #{f}/#{a}"
+      end
+
+    with nil <- user_function.body do
+    else
+      body ->
+        same(
+          env,
+          body.(args),
+          quote(do: unquote(fun_name)(unquote_splicing(args)))
+        )
+    end
+
+    error_message = "A precondition for #{fun_name} does not hold"
+
+    Enum.reduce(user_function.specs, :ok, fn spec, first_result ->
+      result = assert(env, spec.pre.(args), error_message)
+      assume(env, spec.pre.(args))
+      assume(env, spec.post.(args))
+
+      with :ok <- first_result do
+        result
+      end
+    end)
   end
 end

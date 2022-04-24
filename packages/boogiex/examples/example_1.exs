@@ -1,8 +1,16 @@
 import Boogiex
 
+dup = %Boogiex.Env.UserFunction{
+  name: :dup,
+  arity: 1,
+  body: fn [x] ->
+    quote(do: unquote(x) + unquote(x))
+  end
+}
+
 with_local_env(
   on_error: &IO.warn/1,
-  user_functions: MapSet.new([{:dup, 1}])
+  user_functions: [dup]
 ) do
   assert 4 - 2 === 6 - 4
 
@@ -36,8 +44,7 @@ with_local_env(
 
   havoc d
   assume is_integer(d)
-  # alternative: store the body and do unfold(dup(d))
-  define dup(d), as: d + d
+  unfold dup(d)
   assert is_integer(dup(d))
   assert dup(d) === 2 * d
 end

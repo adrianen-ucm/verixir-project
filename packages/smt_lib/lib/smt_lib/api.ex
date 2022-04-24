@@ -3,6 +3,7 @@ defmodule SmtLib.API do
   An API for running SMT-LIB commands as specified in `SmtLib.Syntax`.
   """
 
+  require Logger
   alias SmtLib.Syntax, as: S
   alias SmtLib.Connection, as: C
 
@@ -39,7 +40,10 @@ defmodule SmtLib.API do
 
     responses =
       commands
-      |> Enum.map(&C.send_command(connection, &1))
+      |> Enum.map(fn c ->
+        Logger.debug(SmtLib.String.From.command(c))
+        C.send_command(connection, c)
+      end)
       |> Enum.map(fn r ->
         with :ok <- r,
              {:ok, r} <- C.receive_response(connection) do

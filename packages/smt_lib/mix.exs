@@ -15,6 +15,10 @@ defmodule SmtLib.MixProject do
     ]
   end
 
+  def application do
+    [extra_applications: [:logger]]
+  end
+
   defp deps do
     [
       {:nimble_parsec, "~> 1.0"},

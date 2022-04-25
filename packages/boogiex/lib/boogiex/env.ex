@@ -1,7 +1,7 @@
 defmodule Boogiex.Env do
   alias Boogiex.Theory
   alias SmtLib.Connection
-  alias Boogiex.Env.Config
+  alias Boogiex.Env.UserEnv
   alias SmtLib.Syntax.From
   alias Boogiex.Theory.LitType
   alias Boogiex.Error.SmtError
@@ -10,18 +10,13 @@ defmodule Boogiex.Env do
 
   @opaque t() :: %__MODULE__{
             connection: Connection.t(),
-            config: Config.t()
+            user_env: UserEnv.t()
           }
-  defstruct [:connection, :config]
+  defstruct [:connection, :user_env]
 
-  @spec new(Connection.t(), Config.params()) :: t()
+  @spec new(Connection.t(), UserEnv.params()) :: t()
   def new(connection, params) do
-    config = Config.new(params)
-
-    env = %__MODULE__{
-      connection: connection,
-      config: config
-    }
+    user_env = UserEnv.new(params)
 
     {_, result} =
       SmtLib.API.run(
@@ -40,8 +35,8 @@ defmodule Boogiex.Env do
     {_, result} =
       SmtLib.API.run(
         connection,
-        config
-        |> Config.user_functions()
+        user_env
+        |> UserEnv.user_functions()
         |> Enum.map(fn {name, arity} ->
           Theory.declare_function(name, arity)
         end)
@@ -56,7 +51,10 @@ defmodule Boogiex.Env do
       end
     end
 
-    env
+    %__MODULE__{
+      connection: connection,
+      user_env: user_env
+    }
   end
 
   @spec clear(t()) :: :ok | {:error, term()}
@@ -73,7 +71,7 @@ defmodule Boogiex.Env do
 
   @spec error(t(), term()) :: :ok
   def error(env, e) do
-    env.config.on_error.(e)
+    env.user_env.on_error.(e)
   end
 
   @spec lit_type(t(), term()) :: LitType.t() | nil
@@ -84,7 +82,7 @@ defmodule Boogiex.Env do
   @spec function(t(), atom(), non_neg_integer()) :: Function.t() | nil
   def function(env, name, arity) do
     with nil <- Theory.function(name, arity) do
-      with nil <- Config.user_function(env.config, name, arity) do
+      with nil <- UserEnv.user_function(env.user_env, name, arity) do
         nil
       else
         f -> %Function{name: f.name}
@@ -94,6 +92,6 @@ defmodule Boogiex.Env do
 
   @spec user_function(t(), atom(), non_neg_integer()) :: UserFunction.t() | nil
   def user_function(env, name, arity) do
-    Config.user_function(env.config, name, arity)
+    UserEnv.user_function(env.user_env, name, arity)
   end
 end

@@ -99,7 +99,7 @@ defmodule Boogiex do
   @spec unfold(env(), Macro.t()) :: Macro.t()
   defmacro unfold(env, {f, _, args}) do
     quote do
-      Stm.unfold(
+      Stm.Sugar.unfold(
         unquote(env),
         unquote(Macro.escape(f)),
         unquote(Macro.escape(args))

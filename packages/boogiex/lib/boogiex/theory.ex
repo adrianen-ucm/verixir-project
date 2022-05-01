@@ -341,20 +341,12 @@ defmodule Boogiex.Theory do
           end
         },
         %Spec{
-          pre: fn [x, y] ->
-            quote(do: unquote(x) == unquote(y))
-          end,
-          post: fn [x, y] ->
-            quote(do: :boolean_val.(:term_eq.(unquote(x), unquote(y))))
-          end
-        },
-        %Spec{
           pre: fn [_, _] -> true end,
           post: fn [x, y] ->
             quote(
               do:
                 :boolean_val.(:term_eq.(unquote(x), unquote(y)))
-                ~> (:type.(unquote(x)) == :type.(unquote(y)))
+                <~> (unquote(x) == unquote(y))
             )
           end
         }
@@ -397,20 +389,12 @@ defmodule Boogiex.Theory do
           end
         },
         %Spec{
-          pre: fn [x, y] ->
-            quote(do: unquote(x) == unquote(y))
-          end,
-          post: fn [x, y] ->
-            quote(do: !:boolean_val.(:term_neq.(unquote(x), unquote(y))))
-          end
-        },
-        %Spec{
           pre: fn [_, _] -> true end,
           post: fn [x, y] ->
             quote(
               do:
-                !:boolean_val.(:term_neq.(unquote(x), unquote(y)))
-                ~> (:type.(unquote(x)) == :type.(unquote(y)))
+                :boolean_val.(:term_neq.(unquote(x), unquote(y)))
+                <~> (unquote(x) != unquote(y))
             )
           end
         }

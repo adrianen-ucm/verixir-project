@@ -1,6 +1,6 @@
 import Boogiex
 
-with_local_env do
+with_local_env(on_error: &IO.inspect/1) do
   havoc x
   havoc result
 

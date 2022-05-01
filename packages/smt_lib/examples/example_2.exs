@@ -5,10 +5,12 @@ run do
   declare_sort Term
 
   declare_fun is_integer: Term :: Bool,
-              integer_val: Term :: Int
+              integer_val: Term :: Int,
+              integer_lit: Int :: Term
 
   assert forall(
-           :is_integer.(:x) && :integer_val.(:x) == :x,
+           :is_integer.(:integer_lit.(:x)) &&
+             :integer_val.(:integer_lit.(:x)) == :x,
            x: Int
          )
 end
@@ -42,10 +44,10 @@ end
 
   # assert is_integer(2)
   push
-  assert !:is_integer.(2)
+  assert !:is_integer.(:integer_lit.(2))
   check_sat
   pop
-  assert :is_integer.(2)
+  assert :is_integer.(:integer_lit.(2))
 
   # assert is_integer(x)
   push
@@ -56,10 +58,10 @@ end
 
   # assert result == 2 * x
   push
-  assert :integer_val.(:result) != 2 * :integer_val.(:x)
+  assert :integer_val.(:result) != :integer_val.(:integer_lit.(2)) * :integer_val.(:x)
   check_sat
   pop
-  assert :integer_val.(:result) == 2 * :integer_val.(:x)
+  assert :integer_val.(:result) == :integer_val.(:integer_lit.(2)) * :integer_val.(:x)
 end
 |> close()
 |> IO.inspect()

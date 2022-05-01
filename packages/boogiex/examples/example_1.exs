@@ -9,7 +9,7 @@ dup = %Boogiex.Env.UserFunction{
 }
 
 with_local_env(
-  on_error: &IO.warn/1,
+  on_error: &IO.inspect/1,
   user_functions: [dup]
 ) do
   assert 4 - 2 === 6 - 4

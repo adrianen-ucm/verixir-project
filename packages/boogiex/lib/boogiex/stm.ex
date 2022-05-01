@@ -4,10 +4,11 @@ defmodule Boogiex.Stm do
   alias Boogiex.Env
   alias SmtLib.Syntax.From
   alias Boogiex.Error.SmtError
+  alias Boogiex.Error.EnvError
 
-  @spec havoc(Env.t(), Exp.ast()) :: :ok | {:error, term()}
+  @spec havoc(Env.t(), Exp.ast()) :: :ok | {:error, [term()]}
   def havoc(env, ast) do
-    term = Exp.exp(env, ast)
+    {term, errors} = Exp.exp(env, ast)
 
     {_, declare_result} =
       API.run(
@@ -24,11 +25,20 @@ defmodule Boogiex.Stm do
         error: e,
         context: "declaring the variable #{Macro.to_string(ast)}"
     end
+
+    case errors do
+      [] ->
+        :ok
+
+      errors ->
+        Env.error(env, errors)
+        {:error, errors}
+    end
   end
 
-  @spec assume(Env.t(), Exp.ast()) :: :ok | {:error, term()}
-  def assume(env, ast) do
-    term = Exp.exp(env, ast)
+  @spec assume(Env.t(), Exp.ast(), term()) :: :ok | {:error, term()}
+  def assume(env, ast, error_payload) do
+    {term, errors} = Exp.exp(env, ast)
 
     {_, [push_result, assert_result_1, sat_result, pop_result, assert_result_2]} =
       API.run(
@@ -58,19 +68,25 @@ defmodule Boogiex.Stm do
             context: "trying to assume #{Macro.to_string(ast)}"
       end
 
-    case sat_result do
-      :unsat ->
+    errors =
+      case sat_result do
+        :unsat -> errors
+        _ -> [error_payload | errors]
+      end
+
+    case errors do
+      [] ->
         :ok
 
-      _ ->
-        Env.error(env, :assume_failed)
-        {:error, :assume_failed}
+      errors ->
+        Env.error(env, errors)
+        {:error, errors}
     end
   end
 
   @spec assert(Env.t(), Exp.ast(), term()) :: :ok | {:error, term()}
   def assert(env, ast, error_payload) do
-    term = Exp.exp(env, ast)
+    {term, errors} = Exp.exp(env, ast)
 
     {_, [push_result, assert_result, sat_result_1, pop_result]} =
       API.run(
@@ -126,13 +142,19 @@ defmodule Boogiex.Stm do
             context: "trying to assert #{Macro.to_string(ast)}"
       end
 
-    case {sat_result_1, sat_result_2} do
-      {:unsat, :unsat} ->
+    errors =
+      case {sat_result_1, sat_result_2} do
+        {:unsat, :unsat} -> errors
+        _ -> [error_payload | errors]
+      end
+
+    case errors do
+      [] ->
         :ok
 
-      _ ->
-        Env.error(env, error_payload)
-        {:error, error_payload}
+      errors ->
+        Env.error(env, errors)
+        {:error, errors}
     end
   end
 
@@ -177,8 +199,8 @@ defmodule Boogiex.Stm do
 
   @spec same(Env.t(), Exp.ast(), Exp.ast()) :: :ok | {:error, term()}
   def same(env, e1, e2) do
-    t1 = Exp.exp(env, e1)
-    t2 = Exp.exp(env, e2)
+    {t1, errors1} = Exp.exp(env, e1)
+    {t2, errors2} = Exp.exp(env, e2)
 
     {_, assert_result} =
       API.run(
@@ -194,6 +216,91 @@ defmodule Boogiex.Stm do
       raise SmtError,
         error: e,
         context: "defining #{Macro.to_string(e2)} as #{Macro.to_string(e1)}"
+    end
+
+    case Enum.concat(errors1, errors2) do
+      [] ->
+        :ok
+
+      errors ->
+        Env.error(env, errors)
+        {:error, errors}
+    end
+  end
+
+  @spec unfold(Env.t(), atom(), [Exp.ast()]) :: :ok | {:error, term()}
+  def unfold(env, fun_name, args) do
+    full_name = "#{Atom.to_string(fun_name)}/#{length(args)}"
+
+    user_function =
+      with nil <- Env.user_function(env, fun_name, length(args)) do
+        raise EnvError,
+          message: "Undefined user function #{full_name}"
+      end
+
+    {succeed, errors} =
+      with nil <- user_function.body do
+        {Enum.empty?(user_function.specs), []}
+      else
+        body ->
+          result =
+            same(
+              env,
+              body.(args),
+              quote(do: unquote(fun_name)(unquote_splicing(args)))
+            )
+
+          case result do
+            :ok -> {true, []}
+            {:error, e} -> {false, e}
+          end
+      end
+
+    {succeed, errors} =
+      user_function.specs
+      |> Enum.reduce({succeed, errors}, fn spec, {succeed, errors} ->
+        with :ok <-
+               block(env, fn ->
+                 assert(env, spec.pre.(args), nil)
+               end) do
+          result1 = assume(env, spec.pre.(args), "Assuming a #{full_name} precondition")
+          result2 = assume(env, spec.post.(args), "Assuming a #{full_name} postcondition")
+
+          errors =
+            case result1 do
+              :ok -> errors
+              {:error, e} -> [e | errors]
+            end
+
+          errors =
+            case result2 do
+              :ok -> errors
+              {:error, e} -> [e | errors]
+            end
+
+          case {result1, result2} do
+            {:ok, :ok} -> {true, errors}
+            _ -> {succeed, errors}
+          end
+        else
+          {:error, _} -> {succeed, errors}
+        end
+      end)
+
+    errors =
+      if succeed do
+        List.flatten(errors)
+      else
+        ["No precondition for #{full_name} holds" | List.flatten(errors)]
+      end
+
+    case errors do
+      [] ->
+        :ok
+
+      errors ->
+        Env.error(env, errors)
+        {:error, errors}
     end
   end
 end

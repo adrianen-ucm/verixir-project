@@ -54,11 +54,13 @@ defmodule Boogiex do
   end
 
   @spec assume(env(), Exp.ast()) :: Macro.t()
-  defmacro assume(env, ast) do
+  @spec assume(env(), Exp.ast(), Macro.t()) :: Macro.t()
+  defmacro assume(env, ast, error_payload \\ :assert_failed) do
     quote do
       Stm.assume(
         unquote(env),
-        unquote(Macro.escape(ast))
+        unquote(Macro.escape(ast)),
+        unquote(error_payload)
       )
     end
   end
@@ -86,7 +88,7 @@ defmodule Boogiex do
   end
 
   @spec same(env(), Macro.t(), Macro.t()) :: Macro.t()
-  defmacro same(env, e1, than: e2) do
+  defmacro same(env, e1, as: e2) do
     quote do
       Stm.same(
         unquote(env),
@@ -99,7 +101,7 @@ defmodule Boogiex do
   @spec unfold(env(), Macro.t()) :: Macro.t()
   defmacro unfold(env, {f, _, args}) do
     quote do
-      Stm.Sugar.unfold(
+      Stm.unfold(
         unquote(env),
         unquote(Macro.escape(f)),
         unquote(Macro.escape(args))

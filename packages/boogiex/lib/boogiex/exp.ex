@@ -7,9 +7,11 @@ defmodule Boogiex.Exp do
 
   @type ast :: Macro.t()
 
-  @spec exp(Env.t(), ast()) :: From.ast()
+  @spec exp(Env.t(), ast()) :: {From.ast(), [term()]}
   def exp(env, {fun_name, _, args}) when is_list(args) do
-    arg_terms = Enum.map(args, &exp(env, &1))
+    arg_results = Enum.map(args, &exp(env, &1))
+    arg_terms = Enum.map(arg_results, &elem(&1, 0))
+    arg_errors = Enum.flat_map(arg_results, &elem(&1, 1))
 
     function =
       with nil <- Env.function(env, fun_name, length(arg_terms)) do
@@ -20,69 +22,85 @@ defmodule Boogiex.Exp do
           message: "Unspecified function #{f}/#{a}"
       end
 
-    for spec <- function.specs do
-      {_, [push_result, assert_result, sat_result, pop_result]} =
-        API.run(
-          Env.connection(env),
-          From.commands(
-            quote do
-              push
-              assert !unquote(spec.pre.(arg_terms))
-              check_sat
-              pop
-            end
-          )
-        )
-
-      sat_result =
-        with :ok <- push_result,
-             :ok <- assert_result,
-             {:ok, sat_result} <- sat_result,
-             :ok <- pop_result do
-          sat_result
-        else
-          {:error, e} ->
-            f = Atom.to_string(fun_name)
-            a = length(arg_terms)
-
-            raise SmtError,
-              error: e,
-              context: "checking the #{f}/#{a} preconditions"
-        end
-
-      with :unsat <- sat_result do
-        {_, [assert_pre_result, assert_post_result]} =
+    succeed =
+      function.specs
+      |> Enum.reduce(Enum.empty?(function.specs), fn spec, succeed ->
+        {_, [push_result, assert_result, sat_result, pop_result]} =
           API.run(
             Env.connection(env),
             From.commands(
               quote do
-                assert unquote(spec.pre.(arg_terms))
-                assert unquote(spec.post.(arg_terms))
+                push
+                assert !unquote(spec.pre.(arg_terms))
+                check_sat
+                pop
               end
             )
           )
 
-        with :ok <- assert_pre_result,
-             :ok <- assert_post_result do
+        sat_result =
+          with :ok <- push_result,
+               :ok <- assert_result,
+               {:ok, sat_result} <- sat_result,
+               :ok <- pop_result do
+            sat_result
+          else
+            {:error, e} ->
+              f = Atom.to_string(fun_name)
+              a = length(arg_terms)
+
+              raise SmtError,
+                error: e,
+                context: "checking the #{f}/#{a} preconditions"
+          end
+
+        with :unsat <- sat_result do
+          {_, [assert_pre_result, assert_post_result]} =
+            API.run(
+              Env.connection(env),
+              From.commands(
+                quote do
+                  assert unquote(spec.pre.(arg_terms))
+                  assert unquote(spec.post.(arg_terms))
+                end
+              )
+            )
+
+          with :ok <- assert_pre_result,
+               :ok <- assert_post_result do
+          else
+            {:error, e} ->
+              f = Atom.to_string(fun_name)
+              a = length(arg_terms)
+
+              raise SmtError,
+                error: e,
+                context: "assuming the #{f}/#{a} postconditions"
+          end
+
+          true
         else
-          {:error, e} ->
-            f = Atom.to_string(fun_name)
-            a = length(arg_terms)
-
-            raise SmtError,
-              error: e,
-              context: "checking the #{f}/#{a} postconditions"
+          _ -> succeed
         end
-      end
-    end
+      end)
 
-    quote do
-      unquote(function.name).(unquote_splicing(arg_terms))
-    end
+    {
+      quote(do: unquote(function.name).(unquote_splicing(arg_terms))),
+      if succeed do
+        arg_errors
+      else
+        f = Atom.to_string(fun_name)
+        a = length(arg_terms)
+        ["No precondition for #{f}/#{a} holds" | arg_errors]
+      end
+    }
   end
 
   def exp(_, {var_name, _, _}) do
-    var_name
+    {
+      var_name,
+      []
+    }
   end
 
   def exp(env, literal) do
@@ -114,8 +132,9 @@ defmodule Boogiex.Exp do
           context: "processing the literal #{Macro.to_string(literal)}"
     end
 
-    quote do
-      unquote(lit_type.type_lit).(unquote(literal))
-    end
+    {
+      quote(do: unquote(lit_type.type_lit).(unquote(literal))),
+      []
+    }
   end
 end

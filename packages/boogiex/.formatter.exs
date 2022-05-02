@@ -2,10 +2,10 @@ locals_without_parens = [
   with_env: 1,
   havoc: 1,
   assume: 1,
+  assume: 2,
   assert: 1,
   assert: 2,
   block: 1,
-  same: 2,
   unfold: 1
 ]
 

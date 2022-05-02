@@ -29,10 +29,10 @@ defmodule Boogiex do
           Macro.prewalk(body, fn
             {:havoc, meta, [name]} -> {:havoc, meta, [quote(do: env), name]}
             {:assume, meta, [ast]} -> {:assume, meta, [quote(do: env), ast]}
+            {:assume, meta, [ast, error]} -> {:assume, meta, [quote(do: env), ast, error]}
             {:assert, meta, [ast]} -> {:assert, meta, [quote(do: env), ast]}
             {:assert, meta, [ast, error]} -> {:assert, meta, [quote(do: env), ast, error]}
             {:block, meta, [body]} -> {:block, meta, [quote(do: env), body]}
-            {:same, meta, [ast1, ast2]} -> {:same, meta, [quote(do: env), ast1, ast2]}
             {:unfold, meta, [ast]} -> {:unfold, meta, [quote(do: env), ast]}
             {:with_env, _, _} = nested -> Macro.expand_once(nested, __CALLER__)
             other -> other
@@ -55,7 +55,7 @@ defmodule Boogiex do
 
   @spec assume(env(), Exp.ast()) :: Macro.t()
   @spec assume(env(), Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assume(env, ast, error_payload \\ :assert_failed) do
+  defmacro assume(env, ast, error_payload \\ :assume_failed) do
     quote do
       Stm.assume(
         unquote(env),
@@ -83,17 +83,6 @@ defmodule Boogiex do
       Stm.block(
         unquote(env),
         fn -> unquote(body) end
-      )
-    end
-  end
-
-  @spec same(env(), Macro.t(), Macro.t()) :: Macro.t()
-  defmacro same(env, e1, as: e2) do
-    quote do
-      Stm.same(
-        unquote(env),
-        unquote(Macro.escape(e1)),
-        unquote(Macro.escape(e2))
       )
     end
   end

@@ -141,6 +141,13 @@ defmodule SmtLib.Syntax.From do
     }
   end
 
+  def term({{:., _, [f]}, _, []}) do
+    {
+      :identifier,
+      {:simple, symbol(f)}
+    }
+  end
+
   def term({{:., _, [f]}, _, es = [_ | _]}) do
     {
       :app,

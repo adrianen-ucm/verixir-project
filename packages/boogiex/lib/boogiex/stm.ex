@@ -197,37 +197,6 @@ defmodule Boogiex.Stm do
     result
   end
 
-  @spec same(Env.t(), Exp.ast(), Exp.ast()) :: :ok | {:error, term()}
-  def same(env, e1, e2) do
-    {t1, errors1} = Exp.exp(env, e1)
-    {t2, errors2} = Exp.exp(env, e2)
-
-    {_, assert_result} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            assert unquote(t1) == unquote(t2)
-          end
-        )
-      )
-
-    with {:error, e} <- assert_result do
-      raise SmtError,
-        error: e,
-        context: "defining #{Macro.to_string(e2)} as #{Macro.to_string(e1)}"
-    end
-
-    case Enum.concat(errors1, errors2) do
-      [] ->
-        :ok
-
-      errors ->
-        Env.error(env, errors)
-        {:error, errors}
-    end
-  end
-
   @spec unfold(Env.t(), atom(), [Exp.ast()]) :: :ok | {:error, term()}
   def unfold(env, fun_name, args) do
     full_name = "#{Atom.to_string(fun_name)}/#{length(args)}"
@@ -244,10 +213,10 @@ defmodule Boogiex.Stm do
       else
         body ->
           result =
-            same(
+            assume(
               env,
-              body.(args),
-              quote(do: unquote(fun_name)(unquote_splicing(args)))
+              quote(do: unquote(fun_name)(unquote_splicing(args)) === unquote(body.(args))),
+              "Assuming the #{full_name} body"
             )
 
           case result do

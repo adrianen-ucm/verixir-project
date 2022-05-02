@@ -8,6 +8,56 @@ defmodule Boogiex.Exp do
   @type ast :: Macro.t()
 
   @spec exp(Env.t(), ast()) :: {From.ast(), [term()]}
+  def exp(env, t) when is_tuple(t) and tuple_size(t) < 3 do
+    exp(env, {:{}, [], Tuple.to_list(t)})
+  end
+
+  def exp(env, {:{}, _, args}) do
+    arg_results = Enum.map(args, &exp(env, &1))
+    arg_terms = Enum.map(arg_results, &elem(&1, 0))
+    arg_errors = Enum.flat_map(arg_results, &elem(&1, 1))
+
+    # TODO runtime generator
+    n = length(arg_terms)
+    tuple_n = String.to_existing_atom("tuple_#{n}")
+
+    term = quote(do: unquote(tuple_n).(unquote_splicing(arg_terms)))
+
+    {_, [result_1, result_2]} =
+      API.run(
+        Env.connection(env),
+        From.commands(
+          quote do
+            assert :is_tuple.(unquote(term))
+            assert :tuple_size.(unquote(term)) == unquote(n)
+          end
+        )
+      )
+
+    {_, results} =
+      API.run(
+        Env.connection(env),
+        arg_terms
+        |> Enum.with_index(fn element, index ->
+          quote(do: assert(:elem.(unquote(term), unquote(index)) == unquote(element)))
+        end)
+        |> From.commands()
+      )
+
+    for result <- [result_1, result_2 | List.wrap(results)] do
+      with {:error, e} <- result do
+        raise SmtError,
+          error: e,
+          context: "processing the tuple with contents #{Macro.to_string(args)}"
+      end
+    end
+
+    {
+      term,
+      arg_errors
+    }
+  end
+
   def exp(env, {fun_name, _, args}) when is_list(args) do
     arg_results = Enum.map(args, &exp(env, &1))
     arg_terms = Enum.map(arg_results, &elem(&1, 0))

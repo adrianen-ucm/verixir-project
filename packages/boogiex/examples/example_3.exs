@@ -14,4 +14,6 @@ with_local_env(on_error: &IO.inspect/1) do
   assert {1, 2} === {1, 2}
   assert {1, 2} !== {1, 3}
   assert {1, 2} !== {1, 2, 3}
+
+  assert tuple_size({1, 2, 3, 4, 5, 6, 7, 8, 9, 10}) === 10
 end

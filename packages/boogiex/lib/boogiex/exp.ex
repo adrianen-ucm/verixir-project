@@ -17,10 +17,8 @@ defmodule Boogiex.Exp do
     arg_terms = Enum.map(arg_results, &elem(&1, 0))
     arg_errors = Enum.flat_map(arg_results, &elem(&1, 1))
 
-    # TODO runtime generator
     n = length(arg_terms)
-    tuple_n = String.to_existing_atom("tuple_#{n}")
-
+    tuple_n = Env.tuple_constructor(env, n)
     term = quote(do: unquote(tuple_n).(unquote_splicing(arg_terms)))
 
     {_, [result_1, result_2]} =

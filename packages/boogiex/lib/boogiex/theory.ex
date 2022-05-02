@@ -16,13 +16,7 @@ defmodule Boogiex.Theory do
                   integer_lit: Int :: Term,
                   boolean_lit: Bool :: Term,
                   tuple_size: Term :: Int,
-                  elem: [Term, Int] :: Term,
-
-                  # TODO runtime generator
-                  tuple_0: [] :: Term,
-                  tuple_1: Term :: Term,
-                  tuple_2: [Term, Term] :: Term,
-                  tuple_3: [Term, Term, Term] :: Term
+                  elem: [Term, Int] :: Term
 
       declare_const int: Type,
                     bool: Type,

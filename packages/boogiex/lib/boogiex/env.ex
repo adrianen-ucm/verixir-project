@@ -1,25 +1,29 @@
 defmodule Boogiex.Env do
   alias Boogiex.Theory
+  alias SmtLib.API
   alias SmtLib.Connection
   alias Boogiex.Env.UserEnv
   alias SmtLib.Syntax.From
   alias Boogiex.Theory.LitType
   alias Boogiex.Error.SmtError
+  alias Boogiex.Error.EnvError
   alias Boogiex.Theory.Function
   alias Boogiex.Env.UserFunction
+  alias Boogiex.Env.TupleConstructor
 
   @opaque t() :: %__MODULE__{
+            user_env: UserEnv.t(),
             connection: Connection.t(),
-            user_env: UserEnv.t()
+            tuple_constructor: TupleConstructor.t()
           }
-  defstruct [:connection, :user_env]
+  defstruct [:user_env, :connection, :tuple_constructor]
 
   @spec new(Connection.t(), UserEnv.params()) :: t()
   def new(connection, params) do
     user_env = UserEnv.new(params)
 
     {_, result} =
-      SmtLib.API.run(
+      API.run(
         connection,
         Theory.init() |> From.commands()
       )
@@ -33,7 +37,7 @@ defmodule Boogiex.Env do
     end
 
     {_, result} =
-      SmtLib.API.run(
+      API.run(
         connection,
         user_env
         |> UserEnv.user_functions()
@@ -51,14 +55,26 @@ defmodule Boogiex.Env do
       end
     end
 
+    tuple_constructor =
+      with {:ok, tuple_constructor} <- TupleConstructor.start() do
+        tuple_constructor
+      else
+        {:error, e} ->
+          raise EnvError,
+            message: "Could not start the tuple constructor agent: #{inspect(e)}"
+      end
+
     %__MODULE__{
+      user_env: user_env,
       connection: connection,
-      user_env: user_env
+      tuple_constructor: tuple_constructor
     }
   end
 
   @spec clear(t()) :: :ok | {:error, term()}
   def clear(env) do
+    TupleConstructor.stop(env.tuple_constructor)
+
     env
     |> connection()
     |> Connection.close()
@@ -93,5 +109,31 @@ defmodule Boogiex.Env do
   @spec user_function(t(), atom(), non_neg_integer()) :: UserFunction.t() | nil
   def user_function(env, name, arity) do
     UserEnv.user_function(env.user_env, name, arity)
+  end
+
+  @spec tuple_constructor(t(), non_neg_integer()) :: atom()
+  def tuple_constructor(env, n) do
+    {fresh, name} =
+      TupleConstructor.tuple_constructor(
+        env.tuple_constructor,
+        n
+      )
+
+    if fresh do
+      {_, result} =
+        API.run(
+          connection(env),
+          Theory.declare_function(name, n)
+          |> From.commands()
+        )
+
+      with {:error, e} <- result do
+        raise SmtError,
+          error: e,
+          context: "declaring the tuple constructor #{name}"
+      end
+    end
+
+    name
   end
 end

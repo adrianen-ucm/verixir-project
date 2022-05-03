@@ -258,12 +258,12 @@ defmodule Boogiex.Stm do
 
     errors =
       if succeed do
-        List.flatten(errors)
+        errors
       else
-        ["No precondition for #{full_name} holds" | List.flatten(errors)]
+        ["No precondition for #{full_name} holds" | errors]
       end
 
-    case errors do
+    case List.flatten(errors) do
       [] ->
         :ok
 

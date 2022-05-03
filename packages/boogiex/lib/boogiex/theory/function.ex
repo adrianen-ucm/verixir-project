@@ -5,5 +5,5 @@ defmodule Boogiex.Theory.Function do
           name: atom(),
           specs: [Spec.t()]
         }
-  defstruct [:name, specs: []]
+  defstruct [:name, specs: [%Spec{}]]
 end

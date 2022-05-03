@@ -151,6 +151,49 @@ defmodule Boogiex.Exp do
     }
   end
 
+  def exp(env, l) when is_list(l) do
+    {t, errors, _} =
+      List.foldr(
+        l,
+        {nil, [], 0},
+        fn e, {tail, tail_errors, tail_n} ->
+          {head, head_errors} = exp(env, e)
+
+          list_n = tail_n + 1
+          list = quote(do: :cons.(unquote(head), unquote(tail)))
+
+          {_, results} =
+            API.run(
+              Env.connection(env),
+              From.commands(
+                quote do
+                  assert :is_list.(unquote(list))
+                  assert :length.(unquote(list)) == unquote(list_n)
+                  assert :hd.(unquote(list)) == unquote(head)
+                  assert :tl.(unquote(list)) == unquote(tail)
+                end
+              )
+            )
+
+          for r <- results do
+            with {:error, e} <- r do
+              raise SmtError,
+                error: e,
+                context: "processing the list with contents #{Macro.to_string(l)}"
+            end
+          end
+
+          {
+            quote(do: :cons.(unquote(head), unquote(tail))),
+            [head_errors | tail_errors],
+            list_n
+          }
+        end
+      )
+
+    {t, List.flatten(errors)}
+  end
+
   def exp(env, literal) do
     lit_type =
       with nil <- Env.lit_type(env, literal) do

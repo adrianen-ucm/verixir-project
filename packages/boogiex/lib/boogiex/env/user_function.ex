@@ -8,5 +8,5 @@ defmodule Boogiex.Env.UserFunction do
           specs: [UserSpec.t()],
           body: nil | ([Exp.ast()] -> Exp.ast())
         }
-  defstruct [:name, :arity, specs: [], body: nil]
+  defstruct [:name, :arity, specs: [%UserSpec{}], body: nil]
 end

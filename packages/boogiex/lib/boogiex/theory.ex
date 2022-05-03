@@ -16,19 +16,29 @@ defmodule Boogiex.Theory do
                   integer_lit: Int :: Term,
                   boolean_lit: Bool :: Term,
                   tuple_size: Term :: Int,
-                  elem: [Term, Int] :: Term
+                  elem: [Term, Int] :: Term,
+                  nil: [] :: Term,
+                  cons: [Term, Term] :: Term,
+                  length: Term :: Int,
+                  hd: Term :: Term,
+                  tl: Term :: Term
 
       declare_const int: Type,
                     bool: Type,
-                    tuple: Type
+                    tuple: Type,
+                    list: Type
 
       assert :int != :bool
+      assert :int != :tuple
+      assert :int != :list
       assert :bool != :tuple
-      assert :tuple != :int
+      assert :bool != :list
+      assert :tuple != :list
 
       define_fun is_integer: [x: Term] :: Bool <- :type.(:x) == :int,
                  is_boolean: [x: Term] :: Bool <- :type.(:x) == :bool,
-                 is_tuple: [x: Term] :: Bool <- :type.(:x) == :tuple
+                 is_tuple: [x: Term] :: Bool <- :type.(:x) == :tuple,
+                 is_list: [x: Term] :: Bool <- :type.(:x) == :list
 
       declare_fun term_add: [Term, Term] :: Term,
                   term_sub: [Term, Term] :: Term,
@@ -43,11 +53,17 @@ defmodule Boogiex.Theory do
                   term_neq: [Term, Term] :: Term,
                   term_not: [Term] :: Term,
                   term_neg: [Term] :: Term,
+                  term_tuple_size: Term :: Term,
+                  term_elem: [Term, Term] :: Term,
+                  term_length: Term :: Term,
                   term_is_integer: Term :: Term,
                   term_is_boolean: Term :: Term,
                   term_is_tuple: Term :: Term,
-                  term_tuple_size: Term :: Term,
-                  term_elem: [Term, Term] :: Term
+                  term_is_list: Term :: Term
+
+      assert :is_list.(nil)
+      assert :length.(nil) == 0
+      assert :tl.(nil) == nil
     end
   end
 
@@ -364,7 +380,20 @@ defmodule Boogiex.Theory do
           end
         },
         %Spec{
-          pre: fn [_, _] -> true end,
+          pre: fn [x, y] ->
+            quote(do: :is_list.(unquote(x)) && :is_list.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :boolean_val.(:term_eq.(unquote(x), unquote(y))) ==
+                  ((unquote(x) == nil && unquote(y) == nil) ||
+                     (:hd.(unquote(x)) == :hd.(unquote(y)) &&
+                        :tl.(unquote(x)) == :tl.(unquote(y))))
+            )
+          end
+        },
+        %Spec{
           post: fn [x, y] ->
             quote(
               do:
@@ -427,7 +456,20 @@ defmodule Boogiex.Theory do
           end
         },
         %Spec{
-          pre: fn [_, _] -> true end,
+          pre: fn [x, y] ->
+            quote(do: :is_list.(unquote(x)) && :is_list.(unquote(y)))
+          end,
+          post: fn [x, y] ->
+            quote(
+              do:
+                :boolean_val.(:term_neq.(unquote(x), unquote(y))) ==
+                  !((unquote(x) == nil && unquote(y) == nil) ||
+                      (:hd.(unquote(x)) == :hd.(unquote(y)) &&
+                         :tl.(unquote(x)) == :tl.(unquote(y))))
+            )
+          end
+        },
+        %Spec{
           post: fn [x, y] ->
             quote(
               do:
@@ -528,12 +570,63 @@ defmodule Boogiex.Theory do
     }
   end
 
+  def function(:length, 1) do
+    %Function{
+      name: :term_length,
+      specs: [
+        %Spec{
+          pre: fn [x] -> quote(do: :is_list.(unquote(x))) end,
+          post: fn [x] ->
+            quote(
+              do:
+                :is_integer.(:term_length.(unquote(x))) &&
+                  :integer_val.(:term_length.(unquote(x))) ==
+                    :length.(unquote(x))
+            )
+          end
+        }
+      ]
+    }
+  end
+
+  def function(:hd, 1) do
+    %Function{
+      name: :hd,
+      specs: [
+        %Spec{
+          pre: fn [x] ->
+            quote(
+              do:
+                :is_list.(unquote(x)) &&
+                  unquote(x) != nil
+            )
+          end
+        }
+      ]
+    }
+  end
+
+  def function(:tl, 1) do
+    %Function{
+      name: :tl,
+      specs: [
+        %Spec{
+          pre: fn [x] ->
+            quote(do: :is_list.(unquote(x)))
+          end,
+          post: fn [x] ->
+            quote(do: :is_list.(:tl.(unquote(x))))
+          end
+        }
+      ]
+    }
+  end
+
   def function(:is_integer, 1) do
     %Function{
       name: :term_is_integer,
       specs: [
         %Spec{
-          pre: fn [_] -> true end,
           post: fn [x] ->
             quote(
               do:
@@ -552,7 +645,6 @@ defmodule Boogiex.Theory do
       name: :term_is_boolean,
       specs: [
         %Spec{
-          pre: fn [_] -> true end,
           post: fn [x] ->
             quote(
               do:
@@ -571,13 +663,33 @@ defmodule Boogiex.Theory do
       name: :term_is_tuple,
       specs: [
         %Spec{
-          pre: fn [_] -> true end,
           post: fn [x] ->
             quote(
               do:
-                :is_boolean.(:term_is_tuple.(unquote(x))) &&
+                :tuple_size.(unquote(x)) >= 0 &&
+                  :is_boolean.(:term_is_tuple.(unquote(x))) &&
                   :boolean_val.(:term_is_tuple.(unquote(x))) ==
                     :is_tuple.(unquote(x))
+            )
+          end
+        }
+      ]
+    }
+  end
+
+  def function(:is_list, 1) do
+    %Function{
+      name: :term_is_list,
+      specs: [
+        %Spec{
+          post: fn [x] ->
+            quote(
+              do:
+                :length.(unquote(x)) >= 0 &&
+                  (:length.(unquote(x)) == 0) <~> (unquote(x) == nil) &&
+                  :is_boolean.(:term_is_list.(unquote(x))) &&
+                  :boolean_val.(:term_is_list.(unquote(x))) ==
+                    :is_list.(unquote(x))
             )
           end
         }

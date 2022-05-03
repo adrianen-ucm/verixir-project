@@ -184,7 +184,7 @@ defmodule Boogiex.Exp do
           end
 
           {
-            quote(do: :cons.(unquote(head), unquote(tail))),
+            list,
             [head_errors | tail_errors],
             list_n
           }

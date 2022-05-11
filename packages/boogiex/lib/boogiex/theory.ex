@@ -63,7 +63,6 @@ defmodule Boogiex.Theory do
 
       assert :is_list.(nil)
       assert :length.(nil) == 0
-      assert :tl.(nil) == nil
     end
   end
 

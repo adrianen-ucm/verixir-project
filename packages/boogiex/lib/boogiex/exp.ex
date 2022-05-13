@@ -151,47 +151,47 @@ defmodule Boogiex.Exp do
     }
   end
 
-  def exp(env, l) when is_list(l) do
-    {t, errors, _} =
-      List.foldr(
-        l,
-        {nil, [], 0},
-        fn e, {tail, tail_errors, tail_n} ->
-          {head, head_errors} = exp(env, e)
+  def exp(env, [{:|, _, [h, t]}]) do
+    {head, h_errors} = exp(env, h)
+    {tail, t_errors} = exp(env, t)
+    list = quote(do: :cons.(unquote(head), unquote(tail)))
 
-          list_n = tail_n + 1
-          list = quote(do: :cons.(unquote(head), unquote(tail)))
-
-          {_, results} =
-            API.run(
-              Env.connection(env),
-              From.commands(
-                quote do
-                  assert :is_list.(unquote(list))
-                  assert :length.(unquote(list)) == unquote(list_n)
-                  assert :hd.(unquote(list)) == unquote(head)
-                  assert :tl.(unquote(list)) == unquote(tail)
-                end
-              )
-            )
-
-          for r <- results do
-            with {:error, e} <- r do
-              raise SmtError,
-                error: e,
-                context: "processing the list with contents #{Macro.to_string(l)}"
-            end
+    {_, results} =
+      API.run(
+        Env.connection(env),
+        From.commands(
+          quote do
+            assert :is_nonempty_list.(unquote(list))
+            assert :hd.(unquote(list)) == unquote(head)
+            assert :tl.(unquote(list)) == unquote(tail)
           end
-
-          {
-            list,
-            [head_errors | tail_errors],
-            list_n
-          }
-        end
+        )
       )
 
-    {t, List.flatten(errors)}
+    for r <- results do
+      with {:error, e} <- r do
+        raise SmtError,
+          error: e,
+          context:
+            "processing the list with head #{Macro.to_string(h)} and tail #{Macro.to_string(t)}"
+      end
+    end
+
+    {
+      list,
+      Enum.concat(h_errors, t_errors)
+    }
+  end
+
+  def exp(_, []) do
+    {
+      nil,
+      []
+    }
+  end
+
+  def exp(env, [h | t]) do
+    exp(env, [{:|, [], [h, t]}])
   end
 
   def exp(env, literal) do

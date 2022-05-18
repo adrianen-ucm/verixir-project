@@ -8,4 +8,6 @@ with_local_env(on_error: &IO.inspect/1) do
   assert [1 | [2 | [3 | []]]] === [1, 2, 3]
   assert [1, 2 | [3 | []]] === [1, 2, 3]
   assert tl([1 | 3]) === 3
+
+  assert false, "This should fail"
 end

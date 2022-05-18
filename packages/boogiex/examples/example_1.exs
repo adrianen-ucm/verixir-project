@@ -47,4 +47,6 @@ with_local_env(
   unfold dup(d)
   assert is_integer(dup(d))
   assert dup(d) === 2 * d
+
+  assert false, "This should fail"
 end

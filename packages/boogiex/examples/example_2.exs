@@ -19,4 +19,6 @@ with_local_env(on_error: &IO.inspect/1) do
   with :ok <- assert(result === 2 * x, "Not verified") do
     IO.puts("Verified")
   end
+
+  assert false, "This should fail"
 end

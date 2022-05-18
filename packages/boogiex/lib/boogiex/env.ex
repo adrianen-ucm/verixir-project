@@ -1,11 +1,9 @@
 defmodule Boogiex.Env do
   alias Boogiex.Theory
-  alias SmtLib.API
   alias SmtLib.Connection
+  alias Boogiex.Env.Smt
   alias Boogiex.Env.UserEnv
-  alias SmtLib.Syntax.From
   alias Boogiex.Theory.LitType
-  alias Boogiex.Error.SmtError
   alias Boogiex.Error.EnvError
   alias Boogiex.Theory.Function
   alias Boogiex.Env.UserFunction
@@ -22,39 +20,6 @@ defmodule Boogiex.Env do
   def new(connection, params) do
     user_env = UserEnv.new(params)
 
-    {_, result} =
-      API.run(
-        connection,
-        Theory.init() |> From.commands()
-      )
-
-    for r <- List.wrap(result) do
-      with {:error, e} <- r do
-        raise SmtError,
-          error: e,
-          context: "executing the Boogiex SMT-LIB initialization code"
-      end
-    end
-
-    {_, result} =
-      API.run(
-        connection,
-        user_env
-        |> UserEnv.user_functions()
-        |> Enum.map(fn {name, arity} ->
-          Theory.declare_function(name, arity)
-        end)
-        |> From.commands()
-      )
-
-    for r <- List.wrap(result) do
-      with {:error, e} <- r do
-        raise SmtError,
-          error: e,
-          context: "declaring the user defined functions"
-      end
-    end
-
     tuple_constructor =
       with {:ok, tuple_constructor} <- TupleConstructor.start() do
         tuple_constructor
@@ -64,11 +29,29 @@ defmodule Boogiex.Env do
             message: "Could not start the tuple constructor agent: #{inspect(e)}"
       end
 
-    %__MODULE__{
+    env = %__MODULE__{
       user_env: user_env,
       connection: connection,
       tuple_constructor: tuple_constructor
     }
+
+    Smt.run(
+      env,
+      "executing the Boogiex SMT-LIB initialization code",
+      Theory.init()
+    )
+
+    Smt.run(
+      env,
+      "declaring the user defined functions",
+      user_env
+      |> UserEnv.user_functions()
+      |> Enum.map(fn {name, arity} ->
+        Theory.declare_function(name, arity)
+      end)
+    )
+
+    env
   end
 
   @spec clear(t()) :: :ok | {:error, term()}
@@ -120,18 +103,11 @@ defmodule Boogiex.Env do
       )
 
     if fresh do
-      {_, result} =
-        API.run(
-          connection(env),
-          Theory.declare_function(name, n)
-          |> From.commands()
-        )
-
-      with {:error, e} <- result do
-        raise SmtError,
-          error: e,
-          context: "declaring the tuple constructor #{name}"
-      end
+      Smt.run(
+        env,
+        "declaring the tuple constructor #{name}",
+        Theory.declare_function(name, n)
+      )
     end
 
     name

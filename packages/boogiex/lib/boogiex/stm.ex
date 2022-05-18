@@ -1,203 +1,95 @@
 defmodule Boogiex.Stm do
-  alias SmtLib.API
   alias Boogiex.Exp
   alias Boogiex.Env
-  alias SmtLib.Syntax.From
-  alias Boogiex.Error.SmtError
+  alias Boogiex.Env.Smt
   alias Boogiex.Error.EnvError
 
   @spec havoc(Env.t(), Exp.ast()) :: :ok | {:error, [term()]}
   def havoc(env, ast) do
     {term, errors} = Exp.exp(env, ast)
 
-    {_, declare_result} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            declare_const [{unquote(term), Term}]
-          end
-        )
-      )
+    Smt.run(
+      env,
+      fn -> havoc_context(ast) end,
+      quote(do: declare_const([{unquote(term), Term}]))
+    )
 
-    with {:error, e} <- declare_result do
-      raise SmtError,
-        error: e,
-        context: "declaring the variable #{Macro.to_string(ast)}"
-    end
-
-    case errors do
-      [] ->
-        :ok
-
-      errors ->
-        Env.error(env, errors)
-        {:error, errors}
-    end
+    to_result(env, errors)
   end
 
-  @spec assume(Env.t(), Exp.ast(), term()) :: :ok | {:error, term()}
+  @spec assume(Env.t(), Exp.ast(), term()) :: :ok | {:error, [term()]}
   def assume(env, ast, error_payload) do
     {term, errors} = Exp.exp(env, ast)
 
-    {_, [push_result, assert_result_1, sat_result, pop_result, assert_result_2]} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            push
-            assert !:is_boolean.(unquote(term))
-            check_sat
-            pop
-            assert :boolean_val.(unquote(term))
-          end
-        )
+    valid =
+      Smt.check_valid(
+        env,
+        fn -> assume_context(ast) end,
+        quote(do: :is_boolean.(unquote(term)))
       )
 
-    sat_result =
-      with :ok <- push_result,
-           :ok <- assert_result_1,
-           {:ok, sat_result} <- sat_result,
-           :ok <- pop_result,
-           :ok <- assert_result_2 do
-        sat_result
-      else
-        {:error, e} ->
-          raise SmtError,
-            error: e,
-            context: "trying to assume #{Macro.to_string(ast)}"
-      end
+    Smt.run(
+      env,
+      fn -> assume_context(ast) end,
+      quote(do: assert(:boolean_val.(unquote(term))))
+    )
 
-    errors =
-      case sat_result do
-        :unsat -> errors
-        _ -> [error_payload | errors]
-      end
-
-    case errors do
-      [] ->
-        :ok
-
-      errors ->
-        Env.error(env, errors)
-        {:error, errors}
-    end
+    to_result(
+      env,
+      if(valid, do: errors, else: [error_payload | errors])
+    )
   end
 
-  @spec assert(Env.t(), Exp.ast(), term()) :: :ok | {:error, term()}
+  @spec assert(Env.t(), Exp.ast(), term()) :: :ok | {:error, [term()]}
   def assert(env, ast, error_payload) do
     {term, errors} = Exp.exp(env, ast)
 
-    {_, [push_result, assert_result, sat_result_1, pop_result]} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            push
-            assert !:is_boolean.(unquote(term))
-            check_sat
-            pop
-          end
-        )
+    valid_type =
+      Smt.check_valid(
+        env,
+        fn -> assert_context(ast) end,
+        quote(do: :is_boolean.(unquote(term)))
       )
 
-    sat_result_1 =
-      with :ok <- push_result,
-           :ok <- assert_result,
-           {:ok, sat_result_1} <- sat_result_1,
-           :ok <- pop_result do
-        sat_result_1
-      else
-        {:error, e} ->
-          raise SmtError,
-            error: e,
-            context: "trying to assert #{Macro.to_string(ast)}"
-      end
-
-    {_, [push_result, assert_result_1, sat_result_2, pop_result, assert_result_2]} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            push
-            assert !:boolean_val.(unquote(term))
-            check_sat
-            pop
-            assert :boolean_val.(unquote(term))
-          end
-        )
+    valid_value =
+      Smt.check_valid(
+        env,
+        fn -> assert_context(ast) end,
+        quote(do: :boolean_val.(unquote(term)))
       )
 
-    sat_result_2 =
-      with :ok <- push_result,
-           :ok <- assert_result_1,
-           {:ok, sat_result_2} <- sat_result_2,
-           :ok <- pop_result,
-           :ok <- assert_result_2 do
-        sat_result_2
-      else
-        {:error, e} ->
-          raise SmtError,
-            error: e,
-            context: "trying to assert #{Macro.to_string(ast)}"
-      end
+    Smt.run(
+      env,
+      fn -> assert_context(ast) end,
+      quote(do: assert(:boolean_val.(unquote(term))))
+    )
 
-    errors =
-      case {sat_result_1, sat_result_2} do
-        {:unsat, :unsat} -> errors
-        _ -> [error_payload | errors]
-      end
-
-    case errors do
-      [] ->
-        :ok
-
-      errors ->
-        Env.error(env, errors)
-        {:error, errors}
-    end
+    to_result(
+      env,
+      if(valid_type && valid_value, do: errors, else: [error_payload | errors])
+    )
   end
 
   @spec block(Env.t(), (() -> any())) :: any()
   def block(env, body) do
-    {_, push_result} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            push
-          end
-        )
-      )
-
-    with {:error, e} <- push_result do
-      raise SmtError,
-        error: e,
-        context: "evaluating a block"
-    end
+    Smt.run(
+      env,
+      "evaluating a block",
+      quote(do: push)
+    )
 
     result = body.()
 
-    {_, pop_result} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            pop
-          end
-        )
-      )
-
-    with {:error, e} <- pop_result do
-      raise SmtError,
-        error: e,
-        context: "evaluating a block"
-    end
+    Smt.run(
+      env,
+      "evaluating a block",
+      quote(do: pop)
+    )
 
     result
   end
 
-  @spec unfold(Env.t(), atom(), [Exp.ast()]) :: :ok | {:error, term()}
+  @spec unfold(Env.t(), atom(), [Exp.ast()]) :: :ok | {:error, [term()]}
   def unfold(env, fun_name, args) do
     full_name = "#{Atom.to_string(fun_name)}/#{length(args)}"
 
@@ -216,7 +108,7 @@ defmodule Boogiex.Stm do
             assume(
               env,
               quote(do: unquote(fun_name)(unquote_splicing(args)) === unquote(body.(args))),
-              "Assuming the #{full_name} body"
+              "#{full_name} body expansion does not hold"
             )
 
           case result do
@@ -228,42 +120,41 @@ defmodule Boogiex.Stm do
     {succeed, errors} =
       user_function.specs
       |> Enum.reduce({succeed, errors}, fn spec, {succeed, errors} ->
-        with :ok <-
-               block(env, fn ->
-                 assert(env, spec.pre.(args), nil)
-               end) do
-          result1 = assume(env, spec.pre.(args), "Assuming a #{full_name} precondition")
-          result2 = assume(env, spec.post.(args), "Assuming a #{full_name} postcondition")
-
-          errors =
-            case result1 do
-              :ok -> errors
-              {:error, e} -> [e | errors]
-            end
-
-          errors =
-            case result2 do
-              :ok -> errors
-              {:error, e} -> [e | errors]
-            end
+        with :ok <- block(env, fn -> assert(env, spec.pre.(args), nil) end) do
+          result1 = assume(env, spec.pre.(args), "A #{full_name} precondition do not hold")
+          result2 = assume(env, spec.post.(args), "A #{full_name} postcondition do not hold")
 
           case {result1, result2} do
             {:ok, :ok} -> {true, errors}
-            _ -> {succeed, errors}
+            {{:error, e}, :ok} -> {succeed, [e | errors]}
+            {:ok, {:error, e}} -> {succeed, [e | errors]}
+            {{:error, e1}, {:error, e2}} -> {succeed, [e1, e2 | errors]}
           end
         else
           {:error, _} -> {succeed, errors}
         end
       end)
 
-    errors =
-      if succeed do
-        errors
-      else
-        ["No precondition for #{full_name} holds" | errors]
-      end
+    to_result(
+      env,
+      List.flatten(
+        if(succeed, do: errors, else: ["No precondition for #{full_name} holds" | errors])
+      )
+    )
+  end
 
-    case List.flatten(errors) do
+  @spec havoc_context(Exp.ast()) :: String.t()
+  defp havoc_context(ast), do: "declaring the variable #{Macro.to_string(ast)}"
+
+  @spec assume_context(Exp.ast()) :: String.t()
+  defp assume_context(ast), do: "trying to assume #{Macro.to_string(ast)}"
+
+  @spec assert_context(Exp.ast()) :: String.t()
+  defp assert_context(ast), do: "trying to assert #{Macro.to_string(ast)}"
+
+  @spec to_result(Env.t(), [term()]) :: :ok | {:error, [term()]}
+  defp to_result(env, errors) do
+    case errors do
       [] ->
         :ok
 

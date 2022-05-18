@@ -1,8 +1,7 @@
 defmodule Boogiex.Exp do
-  alias SmtLib.API
   alias Boogiex.Env
+  alias Boogiex.Env.Smt
   alias SmtLib.Syntax.From
-  alias Boogiex.Error.SmtError
   alias Boogiex.Error.EnvError
 
   @type ast :: Macro.t()
@@ -21,39 +20,168 @@ defmodule Boogiex.Exp do
     tuple_n = Env.tuple_constructor(env, n)
     term = quote(do: unquote(tuple_n).(unquote_splicing(arg_terms)))
 
-    {_, [result_1, result_2]} =
-      API.run(
-        Env.connection(env),
-        From.commands(
+    Smt.run(
+      env,
+      fn -> tuple_context(args) end,
+      quote do
+        assert :is_tuple.(unquote(term))
+        assert :tuple_size.(unquote(term)) == unquote(n)
+
+        unquote(
+          Enum.with_index(arg_terms, fn element, index ->
+            quote(do: assert(:elem.(unquote(term), unquote(index)) == unquote(element)))
+          end)
+        )
+      end
+    )
+
+    {term, arg_errors}
+  end
+
+  def exp(env, {:or, _, [e1, e2]}) do
+    {t1, errors} = exp(env, e1)
+
+    valid_type =
+      Smt.check_valid(
+        env,
+        fn -> or_context(e1, e2) end,
+        quote(do: :is_boolean.(unquote(t1)))
+      )
+
+    errors =
+      if(
+        valid_type,
+        do: errors,
+        else: ["#{Macro.to_string(e1)} is not boolean" | errors]
+      )
+
+    always_true =
+      Smt.check_valid(
+        env,
+        fn -> or_context(e1, e2) end,
+        quote(do: :boolean_val.(unquote(t1)))
+      )
+
+    if always_true do
+      {t, errors_2} = exp(env, true)
+      {t, Enum.concat(errors, errors_2)}
+    else
+      always_false =
+        Smt.check_valid(
+          env,
+          fn -> or_context(e1, e2) end,
+          quote(do: !:boolean_val.(unquote(t1)))
+        )
+
+      {t2, errors_2} = exp(env, e2)
+
+      errors = Enum.concat(errors, errors_2)
+
+      if always_false do
+        {t2, errors}
+      else
+        valid_type =
+          Smt.check_valid(
+            env,
+            fn -> or_context(e1, e2) end,
+            quote(do: :is_boolean.(unquote(t2)))
+          )
+
+        errors =
+          if(
+            valid_type,
+            do: errors,
+            else: ["#{Macro.to_string(e2)} is not boolean" | errors]
+          )
+
+        t = quote(do: :term_or.(unquote(t1), unquote(t2)))
+
+        Smt.run(
+          env,
+          fn -> or_context(e1, e2) end,
           quote do
-            assert :is_tuple.(unquote(term))
-            assert :tuple_size.(unquote(term)) == unquote(n)
+            assert :is_boolean.(unquote(t)) &&
+                     :boolean_val.(unquote(t)) ==
+                       (:boolean_val.(unquote(t1)) || :boolean_val.(unquote(t2)))
           end
         )
-      )
 
-    {_, results} =
-      API.run(
-        Env.connection(env),
-        arg_terms
-        |> Enum.with_index(fn element, index ->
-          quote(do: assert(:elem.(unquote(term), unquote(index)) == unquote(element)))
-        end)
-        |> From.commands()
-      )
-
-    for result <- [result_1, result_2 | List.wrap(results)] do
-      with {:error, e} <- result do
-        raise SmtError,
-          error: e,
-          context: "processing the tuple with contents #{Macro.to_string(args)}"
+        {t, errors}
       end
     end
+  end
 
-    {
-      term,
-      arg_errors
-    }
+  def exp(env, {:and, _, [e1, e2]}) do
+    {t1, errors} = exp(env, e1)
+
+    valid_type =
+      Smt.check_valid(
+        env,
+        fn -> and_context(e1, e2) end,
+        quote(do: :is_boolean.(unquote(t1)))
+      )
+
+    errors =
+      if(
+        valid_type,
+        do: errors,
+        else: ["#{Macro.to_string(e1)} is not boolean" | errors]
+      )
+
+    always_false =
+      Smt.check_valid(
+        env,
+        fn -> and_context(e1, e2) end,
+        quote(do: !:boolean_val.(unquote(t1)))
+      )
+
+    if always_false do
+      {t, errors_2} = exp(env, true)
+      {t, Enum.concat(errors, errors_2)}
+    else
+      always_true =
+        Smt.check_valid(
+          env,
+          fn -> and_context(e1, e2) end,
+          quote(do: :boolean_val.(unquote(t1)))
+        )
+
+      {t2, errors_2} = exp(env, e2)
+
+      errors = Enum.concat(errors, errors_2)
+
+      if always_true do
+        {t2, errors}
+      else
+        valid_type =
+          Smt.check_valid(
+            env,
+            fn -> and_context(e1, e2) end,
+            quote(do: :is_boolean.(unquote(t2)))
+          )
+
+        errors =
+          if(
+            valid_type,
+            do: errors,
+            else: ["#{Macro.to_string(e2)} is not boolean" | errors]
+          )
+
+        t = quote(do: :term_and.(unquote(t1), unquote(t2)))
+
+        Smt.run(
+          env,
+          fn -> and_context(e1, e2) end,
+          quote do
+            assert :is_boolean.(unquote(t)) &&
+                     :boolean_val.(unquote(t)) ==
+                       (:boolean_val.(unquote(t1)) && :boolean_val.(unquote(t2)))
+          end
+        )
+
+        {t, errors}
+      end
+    end
   end
 
   def exp(env, {fun_name, _, args}) when is_list(args) do
@@ -63,92 +191,50 @@ defmodule Boogiex.Exp do
 
     function =
       with nil <- Env.function(env, fun_name, length(arg_terms)) do
-        f = Atom.to_string(fun_name)
-        a = length(arg_terms)
-
         raise EnvError,
-          message: "Unspecified function #{f}/#{a}"
+          message: "Unspecified function #{Atom.to_string(fun_name)}/#{length(args)}"
       end
 
     succeed =
       function.specs
       |> Enum.reduce(Enum.empty?(function.specs), fn spec, succeed ->
-        {_, [push_result, assert_result, sat_result, pop_result]} =
-          API.run(
-            Env.connection(env),
-            From.commands(
-              quote do
-                push
-                assert !unquote(spec.pre.(arg_terms))
-                check_sat
-                pop
-              end
-            )
+        valid =
+          Smt.check_valid(
+            env,
+            fn -> apply_context(fun_name, args) end,
+            spec.pre.(arg_terms)
           )
 
-        sat_result =
-          with :ok <- push_result,
-               :ok <- assert_result,
-               {:ok, sat_result} <- sat_result,
-               :ok <- pop_result do
-            sat_result
-          else
-            {:error, e} ->
-              f = Atom.to_string(fun_name)
-              a = length(arg_terms)
-
-              raise SmtError,
-                error: e,
-                context: "checking the #{f}/#{a} preconditions"
-          end
-
-        with :unsat <- sat_result do
-          {_, [assert_pre_result, assert_post_result]} =
-            API.run(
-              Env.connection(env),
-              From.commands(
-                quote do
-                  assert unquote(spec.pre.(arg_terms))
-                  assert unquote(spec.post.(arg_terms))
-                end
-              )
-            )
-
-          with :ok <- assert_pre_result,
-               :ok <- assert_post_result do
-          else
-            {:error, e} ->
-              f = Atom.to_string(fun_name)
-              a = length(arg_terms)
-
-              raise SmtError,
-                error: e,
-                context: "assuming the #{f}/#{a} postconditions"
-          end
+        if valid do
+          Smt.run(
+            env,
+            fn -> apply_context(fun_name, args) end,
+            quote do
+              assert unquote(spec.pre.(arg_terms))
+              assert unquote(spec.post.(arg_terms))
+            end
+          )
 
           true
         else
-          _ -> succeed
+          succeed
         end
       end)
 
     {
       quote(do: unquote(function.name).(unquote_splicing(arg_terms))),
-      if succeed do
-        arg_errors
-      else
-        f = Atom.to_string(fun_name)
-        a = length(arg_terms)
-        ["No precondition for #{f}/#{a} holds" | arg_errors]
-      end
+      if(
+        succeed,
+        do: arg_errors,
+        else: [
+          "No precondition for #{Atom.to_string(fun_name)}/#{length(args)} holds" | arg_errors
+        ]
+      )
     }
   end
 
   def exp(_, {var_name, _, _}) do
-    {
-      var_name,
-      []
-    }
+    {var_name, []}
   end
 
   def exp(env, [{:|, _, [h, t]}]) do
@@ -156,38 +242,21 @@ defmodule Boogiex.Exp do
     {tail, t_errors} = exp(env, t)
     list = quote(do: :cons.(unquote(head), unquote(tail)))
 
-    {_, results} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            assert :is_nonempty_list.(unquote(list))
-            assert :hd.(unquote(list)) == unquote(head)
-            assert :tl.(unquote(list)) == unquote(tail)
-          end
-        )
-      )
-
-    for r <- results do
-      with {:error, e} <- r do
-        raise SmtError,
-          error: e,
-          context:
-            "processing the list with head #{Macro.to_string(h)} and tail #{Macro.to_string(t)}"
+    Smt.run(
+      env,
+      fn -> list_context(h, t) end,
+      quote do
+        assert :is_nonempty_list.(unquote(list))
+        assert :hd.(unquote(list)) == unquote(head)
+        assert :tl.(unquote(list)) == unquote(tail)
       end
-    end
+    )
 
-    {
-      list,
-      Enum.concat(h_errors, t_errors)
-    }
+    {list, Enum.concat(h_errors, t_errors)}
   end
 
   def exp(_, []) do
-    {
-      nil,
-      []
-    }
+    {nil, []}
   end
 
   def exp(env, [h | t]) do
@@ -201,31 +270,36 @@ defmodule Boogiex.Exp do
           message: "Unknown type for literal #{Macro.to_string(literal)}"
       end
 
-    {_, [result_1, result_2]} =
-      API.run(
-        Env.connection(env),
-        From.commands(
-          quote do
-            assert unquote(lit_type.is_type).(unquote(lit_type.type_lit).(unquote(literal)))
+    lit = quote(do: unquote(lit_type.type_lit).(unquote(literal)))
 
-            assert unquote(lit_type.type_val).(unquote(lit_type.type_lit).(unquote(literal))) ==
-                     unquote(literal)
-          end
-        )
-      )
+    Smt.run(
+      env,
+      fn -> literal_context(literal) end,
+      quote do
+        assert unquote(lit_type.is_type).(unquote(lit))
+        assert unquote(lit_type.type_val).(unquote(lit)) == unquote(literal)
+      end
+    )
 
-    with :ok <- result_1,
-         :ok <- result_2 do
-    else
-      {:error, e} ->
-        raise SmtError,
-          error: e,
-          context: "processing the literal #{Macro.to_string(literal)}"
-    end
-
-    {
-      quote(do: unquote(lit_type.type_lit).(unquote(literal))),
-      []
-    }
+    {lit, []}
   end
+
+  @spec tuple_context([ast()]) :: String.t()
+  defp tuple_context(args), do: "processing the tuple with contents #{Macro.to_string(args)}"
+
+  @spec or_context(ast(), ast()) :: String.t()
+  defp or_context(e1, e2), do: "processing #{Macro.to_string(e1)} or #{Macro.to_string(e2)}"
+
+  @spec and_context(ast(), ast()) :: String.t()
+  defp and_context(e1, e2), do: "processing #{Macro.to_string(e1)} and #{Macro.to_string(e2)}"
+
+  @spec apply_context(atom(), [ast()]) :: String.t()
+  defp apply_context(f, args), do: "processing #{Atom.to_string(f)}/#{length(args)}"
+
+  @spec list_context(ast(), ast()) :: String.t()
+  defp list_context(h, t),
+    do: "processing the list with head #{Macro.to_string(h)} and tail #{Macro.to_string(t)}"
+
+  @spec literal_context(ast()) :: String.t()
+  defp literal_context(ast), do: "processing the literal #{Macro.to_string(ast)}"
 end

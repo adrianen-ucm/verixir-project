@@ -39,4 +39,6 @@ with_local_env(on_error: &IO.inspect/1) do
   assume elem(t1, 0) === elem(t2, 0)
   assume elem(t1, 1) === elem(t2, 1)
   assert t1 === t2
+
+  assert false, "This should fail"
 end

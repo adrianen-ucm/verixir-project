@@ -136,7 +136,7 @@ defmodule Boogiex.Exp do
       )
 
     if always_false do
-      {t, errors_2} = exp(env, true)
+      {t, errors_2} = exp(env, false)
       {t, Enum.concat(errors, errors_2)}
     else
       always_true =

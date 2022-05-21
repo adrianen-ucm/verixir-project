@@ -197,30 +197,43 @@ defmodule Boogiex.Exp do
       end
 
     succeed =
-      function.specs
-      |> Enum.reduce(Enum.empty?(function.specs), fn spec, succeed ->
-        valid =
-          Smt.check_valid(
-            env,
-            fn -> Msg.apply_context(fun_name, args) end,
-            spec.pre.(arg_terms)
-          )
-
-        if valid do
+      if Env.is_assuming(env) do
+        function.specs
+        |> Enum.each(fn spec ->
           Smt.run(
             env,
             fn -> Msg.apply_context(fun_name, args) end,
-            quote do
-              assert unquote(spec.pre.(arg_terms))
-              assert unquote(spec.post.(arg_terms))
-            end
+            quote(do: assert(unquote(spec.pre.(arg_terms)) ~> unquote(spec.post.(arg_terms))))
           )
+        end)
 
-          true
-        else
-          succeed
-        end
-      end)
+        true
+      else
+        function.specs
+        |> Enum.reduce(Enum.empty?(function.specs), fn spec, succeed ->
+          valid =
+            Smt.check_valid(
+              env,
+              fn -> Msg.apply_context(fun_name, args) end,
+              spec.pre.(arg_terms)
+            )
+
+          if valid do
+            Smt.run(
+              env,
+              fn -> Msg.apply_context(fun_name, args) end,
+              quote do
+                assert unquote(spec.pre.(arg_terms))
+                assert unquote(spec.post.(arg_terms))
+              end
+            )
+
+            true
+          else
+            succeed
+          end
+        end)
+      end
 
     {
       quote(do: unquote(function.name).(unquote_splicing(arg_terms))),

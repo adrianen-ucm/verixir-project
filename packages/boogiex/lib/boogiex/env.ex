@@ -11,11 +11,12 @@ defmodule Boogiex.Env do
   alias Boogiex.Env.TupleConstructor
 
   @opaque t() :: %__MODULE__{
+            assuming: boolean(),
             user_env: UserEnv.t(),
             connection: Connection.t(),
             tuple_constructor: TupleConstructor.t()
           }
-  defstruct [:user_env, :connection, :tuple_constructor]
+  defstruct [:assuming, :user_env, :connection, :tuple_constructor]
 
   @spec new(Connection.t(), UserEnv.params()) :: t()
   def new(connection, params) do
@@ -31,6 +32,7 @@ defmodule Boogiex.Env do
       end
 
     env = %__MODULE__{
+      assuming: false,
       user_env: user_env,
       connection: connection,
       tuple_constructor: tuple_constructor
@@ -62,6 +64,16 @@ defmodule Boogiex.Env do
     env
     |> connection()
     |> Connection.close()
+  end
+
+  @spec set_assuming(Boogiex.Env.t()) :: Boogiex.Env.t()
+  def set_assuming(env) do
+    %__MODULE__{env | assuming: true}
+  end
+
+  @spec is_assuming(Boogiex.Env.t()) :: boolean()
+  def is_assuming(env) do
+    env.assuming
   end
 
   @spec connection(t()) :: SmtLib.Connection

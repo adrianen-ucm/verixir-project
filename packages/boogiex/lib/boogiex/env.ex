@@ -1,6 +1,7 @@
 defmodule Boogiex.Env do
   alias Boogiex.Theory
   alias SmtLib.Connection
+  alias Boogiex.Msg
   alias Boogiex.Env.Smt
   alias Boogiex.Env.UserEnv
   alias Boogiex.Theory.LitType
@@ -26,7 +27,7 @@ defmodule Boogiex.Env do
       else
         {:error, e} ->
           raise EnvError,
-            message: "Could not start the tuple constructor agent: #{inspect(e)}"
+            message: Msg.could_not_start_tuple_constructor(e)
       end
 
     env = %__MODULE__{
@@ -37,13 +38,13 @@ defmodule Boogiex.Env do
 
     Smt.run(
       env,
-      "executing the Boogiex SMT-LIB initialization code",
+      &Msg.initialize_smt_context/0,
       Theory.init()
     )
 
     Smt.run(
       env,
-      "declaring the user defined functions",
+      &Msg.initialize_user_defined_context/0,
       user_env
       |> UserEnv.user_functions()
       |> Enum.map(fn {name, arity} ->
@@ -105,7 +106,7 @@ defmodule Boogiex.Env do
     if fresh do
       Smt.run(
         env,
-        "declaring the tuple constructor #{name}",
+        fn -> Msg.tuple_constructor_context(name) end,
         Theory.declare_function(name, n)
       )
     end

@@ -2,6 +2,7 @@ defmodule Boogiex do
   alias Boogiex.Stm
   alias Boogiex.Env
   alias Boogiex.Exp
+  alias Boogiex.Msg
   alias SmtLib.Connection.Z3, as: Default
 
   @type env :: Macro.t()
@@ -55,24 +56,24 @@ defmodule Boogiex do
 
   @spec assume(env(), Exp.ast()) :: Macro.t()
   @spec assume(env(), Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assume(env, ast, error_payload \\ :assume_failed) do
+  defmacro assume(env, ast, error_msg \\ quote(do: &Msg.assume_failed/0)) do
     quote do
       Stm.assume(
         unquote(env),
         unquote(Macro.escape(ast)),
-        unquote(error_payload)
+        unquote(error_msg)
       )
     end
   end
 
   @spec assert(env(), Exp.ast()) :: Macro.t()
   @spec assert(env(), Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assert(env, ast, error_payload \\ :assert_failed) do
+  defmacro assert(env, ast, error_msg \\ quote(do: &Msg.assert_failed/0)) do
     quote do
       Stm.assert(
         unquote(env),
         unquote(Macro.escape(ast)),
-        unquote(error_payload)
+        unquote(error_msg)
       )
     end
   end

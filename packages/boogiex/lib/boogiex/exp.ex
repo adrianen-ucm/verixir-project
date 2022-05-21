@@ -1,5 +1,6 @@
 defmodule Boogiex.Exp do
   alias Boogiex.Env
+  alias Boogiex.Msg
   alias Boogiex.Env.Smt
   alias SmtLib.Syntax.From
   alias Boogiex.Error.EnvError
@@ -22,7 +23,7 @@ defmodule Boogiex.Exp do
 
     Smt.run(
       env,
-      fn -> tuple_context(args) end,
+      fn -> Msg.tuple_context(args) end,
       quote do
         assert :is_tuple.(unquote(term))
         assert :tuple_size.(unquote(term)) == unquote(n)
@@ -44,7 +45,7 @@ defmodule Boogiex.Exp do
     valid_type =
       Smt.check_valid(
         env,
-        fn -> or_context(e1, e2) end,
+        fn -> Msg.or_context(e1, e2) end,
         quote(do: :is_boolean.(unquote(t1)))
       )
 
@@ -52,13 +53,13 @@ defmodule Boogiex.Exp do
       if(
         valid_type,
         do: errors,
-        else: ["#{Macro.to_string(e1)} is not boolean" | errors]
+        else: [Msg.not_boolean(e1) | errors]
       )
 
     always_true =
       Smt.check_valid(
         env,
-        fn -> or_context(e1, e2) end,
+        fn -> Msg.or_context(e1, e2) end,
         quote(do: :boolean_val.(unquote(t1)))
       )
 
@@ -69,7 +70,7 @@ defmodule Boogiex.Exp do
       always_false =
         Smt.check_valid(
           env,
-          fn -> or_context(e1, e2) end,
+          fn -> Msg.or_context(e1, e2) end,
           quote(do: !:boolean_val.(unquote(t1)))
         )
 
@@ -83,7 +84,7 @@ defmodule Boogiex.Exp do
         valid_type =
           Smt.check_valid(
             env,
-            fn -> or_context(e1, e2) end,
+            fn -> Msg.or_context(e1, e2) end,
             quote(do: :is_boolean.(unquote(t2)))
           )
 
@@ -91,14 +92,14 @@ defmodule Boogiex.Exp do
           if(
             valid_type,
             do: errors,
-            else: ["#{Macro.to_string(e2)} is not boolean" | errors]
+            else: [Msg.not_boolean(e2) | errors]
           )
 
         t = quote(do: :term_or.(unquote(t1), unquote(t2)))
 
         Smt.run(
           env,
-          fn -> or_context(e1, e2) end,
+          fn -> Msg.or_context(e1, e2) end,
           quote do
             assert :is_boolean.(unquote(t)) &&
                      :boolean_val.(unquote(t)) ==
@@ -117,7 +118,7 @@ defmodule Boogiex.Exp do
     valid_type =
       Smt.check_valid(
         env,
-        fn -> and_context(e1, e2) end,
+        fn -> Msg.and_context(e1, e2) end,
         quote(do: :is_boolean.(unquote(t1)))
       )
 
@@ -125,13 +126,13 @@ defmodule Boogiex.Exp do
       if(
         valid_type,
         do: errors,
-        else: ["#{Macro.to_string(e1)} is not boolean" | errors]
+        else: [Msg.not_boolean(e1) | errors]
       )
 
     always_false =
       Smt.check_valid(
         env,
-        fn -> and_context(e1, e2) end,
+        fn -> Msg.and_context(e1, e2) end,
         quote(do: !:boolean_val.(unquote(t1)))
       )
 
@@ -142,7 +143,7 @@ defmodule Boogiex.Exp do
       always_true =
         Smt.check_valid(
           env,
-          fn -> and_context(e1, e2) end,
+          fn -> Msg.and_context(e1, e2) end,
           quote(do: :boolean_val.(unquote(t1)))
         )
 
@@ -156,7 +157,7 @@ defmodule Boogiex.Exp do
         valid_type =
           Smt.check_valid(
             env,
-            fn -> and_context(e1, e2) end,
+            fn -> Msg.and_context(e1, e2) end,
             quote(do: :is_boolean.(unquote(t2)))
           )
 
@@ -164,14 +165,14 @@ defmodule Boogiex.Exp do
           if(
             valid_type,
             do: errors,
-            else: ["#{Macro.to_string(e2)} is not boolean" | errors]
+            else: [Msg.not_boolean(e2) | errors]
           )
 
         t = quote(do: :term_and.(unquote(t1), unquote(t2)))
 
         Smt.run(
           env,
-          fn -> and_context(e1, e2) end,
+          fn -> Msg.and_context(e1, e2) end,
           quote do
             assert :is_boolean.(unquote(t)) &&
                      :boolean_val.(unquote(t)) ==
@@ -192,7 +193,7 @@ defmodule Boogiex.Exp do
     function =
       with nil <- Env.function(env, fun_name, length(arg_terms)) do
         raise EnvError,
-          message: "Unspecified function #{Atom.to_string(fun_name)}/#{length(args)}"
+          message: Msg.undefined_function(fun_name, args)
       end
 
     succeed =
@@ -201,14 +202,14 @@ defmodule Boogiex.Exp do
         valid =
           Smt.check_valid(
             env,
-            fn -> apply_context(fun_name, args) end,
+            fn -> Msg.apply_context(fun_name, args) end,
             spec.pre.(arg_terms)
           )
 
         if valid do
           Smt.run(
             env,
-            fn -> apply_context(fun_name, args) end,
+            fn -> Msg.apply_context(fun_name, args) end,
             quote do
               assert unquote(spec.pre.(arg_terms))
               assert unquote(spec.post.(arg_terms))
@@ -227,7 +228,7 @@ defmodule Boogiex.Exp do
         succeed,
         do: arg_errors,
         else: [
-          "No precondition for #{Atom.to_string(fun_name)}/#{length(args)} holds" | arg_errors
+          Msg.no_precondition_holds(fun_name, args) | arg_errors
         ]
       )
     }
@@ -244,7 +245,7 @@ defmodule Boogiex.Exp do
 
     Smt.run(
       env,
-      fn -> list_context(h, t) end,
+      fn -> Msg.list_context(h, t) end,
       quote do
         assert :is_nonempty_list.(unquote(list))
         assert :hd.(unquote(list)) == unquote(head)
@@ -267,14 +268,14 @@ defmodule Boogiex.Exp do
     lit_type =
       with nil <- Env.lit_type(env, literal) do
         raise EnvError,
-          message: "Unknown type for literal #{Macro.to_string(literal)}"
+          message: Msg.unknown_literal_type(literal)
       end
 
     lit = quote(do: unquote(lit_type.type_lit).(unquote(literal)))
 
     Smt.run(
       env,
-      fn -> literal_context(literal) end,
+      fn -> Msg.literal_context(literal) end,
       quote do
         assert unquote(lit_type.is_type).(unquote(lit))
         assert unquote(lit_type.type_val).(unquote(lit)) == unquote(literal)
@@ -283,23 +284,4 @@ defmodule Boogiex.Exp do
 
     {lit, []}
   end
-
-  @spec tuple_context([ast()]) :: String.t()
-  defp tuple_context(args), do: "processing the tuple with contents #{Macro.to_string(args)}"
-
-  @spec or_context(ast(), ast()) :: String.t()
-  defp or_context(e1, e2), do: "processing #{Macro.to_string(e1)} or #{Macro.to_string(e2)}"
-
-  @spec and_context(ast(), ast()) :: String.t()
-  defp and_context(e1, e2), do: "processing #{Macro.to_string(e1)} and #{Macro.to_string(e2)}"
-
-  @spec apply_context(atom(), [ast()]) :: String.t()
-  defp apply_context(f, args), do: "processing #{Atom.to_string(f)}/#{length(args)}"
-
-  @spec list_context(ast(), ast()) :: String.t()
-  defp list_context(h, t),
-    do: "processing the list with head #{Macro.to_string(h)} and tail #{Macro.to_string(t)}"
-
-  @spec literal_context(ast()) :: String.t()
-  defp literal_context(ast), do: "processing the literal #{Macro.to_string(ast)}"
 end

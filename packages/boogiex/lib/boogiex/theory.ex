@@ -11,6 +11,7 @@ defmodule Boogiex.Theory do
       declare_sort Type
 
       declare_fun type: Term :: Type,
+                  term_size: Term :: Int,
                   integer_val: Term :: Int,
                   boolean_val: Term :: Bool,
                   integer_lit: Int :: Term,
@@ -59,6 +60,40 @@ defmodule Boogiex.Theory do
                   term_is_boolean: Term :: Term,
                   term_is_tuple: Term :: Term,
                   term_is_list: Term :: Term
+
+      assert :term_size.(nil) == 1
+
+      assert forall(
+               (:type.(:x) == :int) ~> (:term_size.(:x) == 1),
+               x: Term
+             )
+
+      assert forall(
+               (:type.(:x) == :bool) ~> (:term_size.(:x) == 1),
+               x: Term
+             )
+
+      assert forall(
+               (:type.(:x) == :nonempty_list)
+               ~> (:term_size.(:x) == 1 + :term_size.(:hd.(:x)) + :term_size.(:tl.(:x))),
+               x: Term
+             )
+
+      assert forall(
+               (:type.(:x) == :tuple && :tuple_size.(:x) == 0)
+               ~> (:term_size.(:x) == 1),
+               x: Term
+             )
+
+      assert forall(
+               (:type.(:x) == :tuple)
+               ~> forall(
+                 (:n >= 0 && :n < :tuple_size.(:x))
+                 ~> (:term_size.(:elem.(:x, :n)) < :term_size.(:x)),
+                 n: Int
+               ),
+               x: Term
+             )
     end
   end
 
@@ -549,8 +584,7 @@ defmodule Boogiex.Theory do
           post: fn [x] ->
             quote(
               do:
-                :tuple_size.(unquote(x)) >= 0 &&
-                  :is_boolean.(:term_is_tuple.(unquote(x))) &&
+                :is_boolean.(:term_is_tuple.(unquote(x))) &&
                   :boolean_val.(:term_is_tuple.(unquote(x))) ==
                     :is_tuple.(unquote(x))
             )

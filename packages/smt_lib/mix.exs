@@ -23,7 +23,7 @@ defmodule SmtLib.MixProject do
     [
       {:nimble_parsec, "~> 1.0"},
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.0", only: [:dev], runtime: false}
+      {:dialyxir, "~> 1.0", only: :dev, runtime: false}
     ]
   end
 

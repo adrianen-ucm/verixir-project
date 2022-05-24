@@ -80,12 +80,6 @@ defmodule Boogiex.Theory do
              )
 
       assert forall(
-               (:type.(:x) == :tuple && :tuple_size.(:x) == 0)
-               ~> (:term_size.(:x) == 1),
-               x: Term
-             )
-
-      assert forall(
                (:type.(:x) == :tuple)
                ~> forall(
                  (:n >= 0 && :n < :tuple_size.(:x))
@@ -128,6 +122,30 @@ defmodule Boogiex.Theory do
             [unquote_splicing(List.duplicate(:Term, arity))] :: Term
           }
         ])
+    )
+  end
+
+  @spec declare_tuple_term_size(non_neg_integer()) :: From.ast()
+  def declare_tuple_term_size(n) do
+    quote(
+      do:
+        assert(
+          forall(
+            (:type.(:x) == :tuple && :tuple_size.(:x) == unquote(n))
+            ~> (:term_size.(:x) ==
+                  1 +
+                    unquote(
+                      Enum.reduce(
+                        1..n,
+                        0,
+                        fn i, a ->
+                          quote(do: unquote(a) + :term_size.(:elem.(:x, unquote(i - 1))))
+                        end
+                      )
+                    )),
+            x: Term
+          )
+        )
     )
   end
 

@@ -119,7 +119,10 @@ defmodule Boogiex.Env do
       Smt.run(
         env,
         fn -> Msg.tuple_constructor_context(name) end,
-        Theory.declare_function(name, n)
+        quote do
+          unquote(Theory.declare_function(name, n))
+          unquote(Theory.declare_tuple_term_size(n))
+        end
       )
     end
 

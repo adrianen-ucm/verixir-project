@@ -2,14 +2,12 @@ defmodule Verixir do
   alias Boogiex.Env.UserFunction
   alias Boogiex.Env.UserSpec
 
-  @verifier_key :verifier
-  @verification_functions_key :verification_functions
-
+  @spec __using__([]) :: Macro.t()
   defmacro __using__(_) do
     quote do
       import unquote(__MODULE__)
-      @verifier_key unquote(@verifier_key)
-      @verification_functions_key unquote(@verification_functions_key)
+      @verifier_key :verifier
+      @verification_functions_key :verification_functions
 
       Module.register_attribute(
         __MODULE__,

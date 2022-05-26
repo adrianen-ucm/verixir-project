@@ -74,8 +74,13 @@ defmodule Boogiex.Exp do
           quote(do: !:boolean_val.(unquote(t1)))
         )
 
-      {t2, errors_2} = exp(env, e2)
+      env_t1_assumed =
+        Env.add_assumption(
+          env,
+          quote(do: !:boolean_val.(unquote(t1)))
+        )
 
+      {t2, errors_2} = exp(env_t1_assumed, e2)
       errors = Enum.concat(errors, errors_2)
 
       if always_false do
@@ -83,7 +88,7 @@ defmodule Boogiex.Exp do
       else
         valid_type =
           Smt.check_valid(
-            env,
+            env_t1_assumed,
             fn -> Msg.or_context(e1, e2) end,
             quote(do: :is_boolean.(unquote(t2)))
           )
@@ -147,8 +152,13 @@ defmodule Boogiex.Exp do
           quote(do: :boolean_val.(unquote(t1)))
         )
 
-      {t2, errors_2} = exp(env, e2)
+      env_t1_assumed =
+        Env.add_assumption(
+          env,
+          quote(do: :boolean_val.(unquote(t1)))
+        )
 
+      {t2, errors_2} = exp(env_t1_assumed, e2)
       errors = Enum.concat(errors, errors_2)
 
       if always_true do
@@ -156,7 +166,7 @@ defmodule Boogiex.Exp do
       else
         valid_type =
           Smt.check_valid(
-            env,
+            env_t1_assumed,
             fn -> Msg.and_context(e1, e2) end,
             quote(do: :is_boolean.(unquote(t2)))
           )
@@ -197,43 +207,30 @@ defmodule Boogiex.Exp do
       end
 
     succeed =
-      if Env.is_assuming(env) do
-        function.specs
-        |> Enum.each(fn spec ->
+      function.specs
+      |> Enum.reduce(Enum.empty?(function.specs), fn spec, succeed ->
+        valid =
+          Smt.check_valid(
+            env,
+            fn -> Msg.apply_context(fun_name, args) end,
+            spec.pre.(arg_terms)
+          )
+
+        if valid do
           Smt.run(
             env,
             fn -> Msg.apply_context(fun_name, args) end,
-            quote(do: assert(unquote(spec.pre.(arg_terms)) ~> unquote(spec.post.(arg_terms))))
+            quote do
+              assert unquote(spec.pre.(arg_terms))
+              assert unquote(spec.post.(arg_terms))
+            end
           )
-        end)
 
-        true
-      else
-        function.specs
-        |> Enum.reduce(Enum.empty?(function.specs), fn spec, succeed ->
-          valid =
-            Smt.check_valid(
-              env,
-              fn -> Msg.apply_context(fun_name, args) end,
-              spec.pre.(arg_terms)
-            )
-
-          if valid do
-            Smt.run(
-              env,
-              fn -> Msg.apply_context(fun_name, args) end,
-              quote do
-                assert unquote(spec.pre.(arg_terms))
-                assert unquote(spec.post.(arg_terms))
-              end
-            )
-
-            true
-          else
-            succeed
-          end
-        end)
-      end
+          true
+        else
+          succeed
+        end
+      end)
 
     {
       quote(do: unquote(function.name).(unquote_splicing(arg_terms))),

@@ -22,7 +22,7 @@ defmodule Boogiex.Stm do
 
   @spec assume(Env.t(), Exp.ast(), error_msg()) :: :ok | {:error, [term()]}
   def assume(env, ast, error_msg) do
-    {term, errors} = Exp.exp(Env.set_assuming(env), ast)
+    {term, errors} = Exp.exp(env, ast)
 
     valid =
       Smt.check_valid(

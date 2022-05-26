@@ -1,6 +1,7 @@
 defmodule Boogiex.Env do
   alias Boogiex.Theory
   alias SmtLib.Connection
+  alias SmtLib.Syntax.From
   alias Boogiex.Msg
   alias Boogiex.Env.Smt
   alias Boogiex.Env.UserEnv
@@ -11,12 +12,12 @@ defmodule Boogiex.Env do
   alias Boogiex.Env.TupleConstructor
 
   @opaque t() :: %__MODULE__{
-            assuming: boolean(),
+            assumptions: [From.ast()],
             user_env: UserEnv.t(),
             connection: Connection.t(),
             tuple_constructor: TupleConstructor.t()
           }
-  defstruct [:assuming, :user_env, :connection, :tuple_constructor]
+  defstruct [:assumptions, :user_env, :connection, :tuple_constructor]
 
   @spec new(Connection.t(), UserEnv.params()) :: t()
   def new(connection, params) do
@@ -32,7 +33,7 @@ defmodule Boogiex.Env do
       end
 
     env = %__MODULE__{
-      assuming: false,
+      assumptions: [],
       user_env: user_env,
       connection: connection,
       tuple_constructor: tuple_constructor
@@ -66,14 +67,14 @@ defmodule Boogiex.Env do
     |> Connection.close()
   end
 
-  @spec set_assuming(Boogiex.Env.t()) :: Boogiex.Env.t()
-  def set_assuming(env) do
-    %__MODULE__{env | assuming: true}
+  @spec add_assumption(t(), From.ast()) :: t()
+  def add_assumption(env, assumption) do
+    %__MODULE__{env | assumptions: [assumption | env.assumptions]}
   end
 
-  @spec is_assuming(Boogiex.Env.t()) :: boolean()
-  def is_assuming(env) do
-    env.assuming
+  @spec assumptions(t()) :: [From.ast()]
+  def assumptions(env) do
+    env.assumptions
   end
 
   @spec connection(t()) :: SmtLib.Connection

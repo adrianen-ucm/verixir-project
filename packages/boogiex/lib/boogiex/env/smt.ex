@@ -22,18 +22,42 @@ defmodule Boogiex.Env.Smt do
 
   @spec check_valid(Boogiex.Env.t(), context(), From.ast()) :: boolean()
   def check_valid(env, context, ast) do
-    {_, [push_result, assert_result, sat_result, pop_result]} =
+    {_, results} =
       API.run(
         Env.connection(env),
         From.commands(
           quote do
             push
+
+            unquote(
+              Env.assumptions(env)
+              |> Enum.map(fn a ->
+                quote(do: assert(unquote(a)))
+              end)
+            )
+
             assert !unquote(ast)
             check_sat
             pop
           end
         )
       )
+
+    [push_result | results] = results
+
+    {assumption_results, results} =
+      Enum.split(
+        results,
+        length(Env.assumptions(env))
+      )
+
+    [assert_result, sat_result, pop_result] = results
+
+    for result <- assumption_results do
+      with {:error, e} <- result do
+        raise SmtError, error: e, context: from_context(context)
+      end
+    end
 
     :unsat ==
       with :ok <- push_result,

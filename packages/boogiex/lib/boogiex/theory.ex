@@ -347,6 +347,18 @@ defmodule Boogiex.Theory do
         },
         %Spec{
           pre: fn [x, y] ->
+            quote(
+              do:
+                :is_tuple.(unquote(x)) && :is_tuple.(unquote(y)) &&
+                  :tuple_size.(unquote(x)) != :tuple_size.(unquote(y))
+            )
+          end,
+          post: fn [x, y] ->
+            quote(do: !:boolean_val.(:term_eq.(unquote(x), unquote(y))))
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
             quote(do: :is_list.(unquote(x)) && :is_list.(unquote(y)))
           end,
           post: fn [x, y] ->
@@ -419,6 +431,18 @@ defmodule Boogiex.Theory do
                     n: Int
                   )
             )
+          end
+        },
+        %Spec{
+          pre: fn [x, y] ->
+            quote(
+              do:
+                :is_tuple.(unquote(x)) && :is_tuple.(unquote(y)) &&
+                  :tuple_size.(unquote(x)) != :tuple_size.(unquote(y))
+            )
+          end,
+          post: fn [x, y] ->
+            quote(do: :boolean_val.(:term_neq.(unquote(x), unquote(y))))
           end
         },
         %Spec{

@@ -192,6 +192,7 @@ defmodule SmtLib.Syntax.From do
         when deep_command_list: [S.command_t() | deep_command_list]
   defp commands_rec(ast) do
     case ast do
+      nil -> []
       {:__block__, _, ast} -> commands_rec(ast)
       [do: ast] -> commands_rec(ast)
       asts when is_list(asts) -> Enum.map(asts, &commands_rec(&1))

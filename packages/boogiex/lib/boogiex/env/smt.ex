@@ -45,13 +45,11 @@ defmodule Boogiex.Env.Smt do
 
     [push_result | results] = results
 
-    {assumption_results, results} =
+    {assumption_results, [assert_result, sat_result, pop_result]} =
       Enum.split(
         results,
         length(Env.assumptions(env))
       )
-
-    [assert_result, sat_result, pop_result] = results
 
     for result <- assumption_results do
       with {:error, e} <- result do

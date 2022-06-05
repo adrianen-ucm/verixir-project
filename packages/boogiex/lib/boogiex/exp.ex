@@ -28,6 +28,18 @@ defmodule Boogiex.Exp do
         assert :is_tuple.(unquote(term))
         assert :tuple_size.(unquote(term)) == unquote(n)
 
+        assert :term_size.(unquote(term)) ==
+                 1 +
+                   unquote(
+                     Enum.reduce(
+                       arg_terms,
+                       0,
+                       fn element, a ->
+                         quote(do: unquote(a) + :term_size.(unquote(element)))
+                       end
+                     )
+                   )
+
         unquote(
           Enum.with_index(arg_terms, fn element, index ->
             quote(do: assert(:elem.(unquote(term), unquote(index)) == unquote(element)))

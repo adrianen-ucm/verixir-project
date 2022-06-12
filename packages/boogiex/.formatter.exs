@@ -6,7 +6,12 @@ locals_without_parens = [
   assert: 1,
   assert: 2,
   block: 1,
-  unfold: 1
+  unfold: 1,
+  fail: 1,
+  add: 1,
+  context: 2,
+  declare_const: 1,
+  when_unsat: 2
 ]
 
 [

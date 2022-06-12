@@ -10,7 +10,7 @@ defmodule Example do
 
   with_local_env(
     on_error: &IO.inspect/1,
-    user_functions:
+    functions:
       Module.get_attribute(
         __MODULE__,
         @verification_functions_key

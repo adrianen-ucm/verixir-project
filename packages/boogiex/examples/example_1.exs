@@ -1,6 +1,6 @@
 import Boogiex
 
-dup = %Boogiex.Env.UserFunction{
+dup = %Boogiex.UserDefined.Function{
   name: :dup,
   arity: 1,
   body: fn [x] ->
@@ -10,7 +10,7 @@ dup = %Boogiex.Env.UserFunction{
 
 with_local_env(
   on_error: &IO.inspect/1,
-  user_functions: [dup]
+  functions: [dup]
 ) do
   assert 4 - 2 === 6 - 4
 
@@ -36,6 +36,7 @@ with_local_env(
   havoc b
   havoc c
 
+  assume is_integer(a) and is_integer(b)
   assume is_integer(a) and is_integer(b) and is_integer(c)
 
   assume a === b

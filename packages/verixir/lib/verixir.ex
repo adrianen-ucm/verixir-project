@@ -1,6 +1,6 @@
 defmodule Verixir do
-  alias Boogiex.Env.UserFunction
-  alias Boogiex.Env.UserSpec
+  alias Boogiex.UserDefined.Function
+  alias Boogiex.UserDefined.Spec
 
   @spec __using__([]) :: Macro.t()
   defmacro __using__(_) do
@@ -53,18 +53,18 @@ defmodule Verixir do
   def defv_no_macro(name, arity, replacer, body, attributes) do
     specs =
       for {:spec, spec} <- with(nil <- attributes, do: []) do
-        user_spec = %UserSpec{}
+        user_spec = %Spec{}
 
         user_spec =
           case Keyword.get(spec, :requires) do
             nil -> user_spec
-            requires -> %UserSpec{user_spec | pre: replacer.(requires)}
+            requires -> %Spec{user_spec | pre: replacer.(requires)}
           end
 
         user_spec =
           case Keyword.get(spec, :ensures) do
             nil -> user_spec
-            ensures -> %UserSpec{user_spec | post: replacer.(ensures)}
+            ensures -> %Spec{user_spec | post: replacer.(ensures)}
           end
 
         user_spec
@@ -79,7 +79,7 @@ defmodule Verixir do
           replacer.(body)
       end
 
-    %UserFunction{
+    %Function{
       name: name,
       arity: arity,
       specs: specs,

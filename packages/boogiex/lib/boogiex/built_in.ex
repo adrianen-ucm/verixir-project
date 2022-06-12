@@ -1,8 +1,8 @@
-defmodule Boogiex.Theory do
+defmodule Boogiex.BuiltIn do
   alias SmtLib.Syntax.From
-  alias Boogiex.Theory.Spec
-  alias Boogiex.Theory.LitType
-  alias Boogiex.Theory.Function
+  alias Boogiex.BuiltIn.Spec
+  alias Boogiex.BuiltIn.LitType
+  alias Boogiex.BuiltIn.Function
 
   @spec init :: From.ast()
   def init() do

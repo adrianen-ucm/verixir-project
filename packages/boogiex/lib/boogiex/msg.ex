@@ -1,4 +1,9 @@
 defmodule Boogiex.Msg do
+  @spec evaluate_exp_context(Macro.t()) :: String.t()
+  def evaluate_exp_context(ast) do
+    "evaluating expression #{Macro.to_string(ast)}"
+  end
+
   @spec havoc_context(Macro.t()) :: String.t()
   def havoc_context(ast) do
     "declaring the variable #{Macro.to_string(ast)}"
@@ -39,6 +44,11 @@ defmodule Boogiex.Msg do
     "processing #{Atom.to_string(f)}/#{length(args)}"
   end
 
+  @spec unfold_context(Macro.t(), [Macro.t()], Macro.t()) :: String.t()
+  def unfold_context(f, args, body) do
+    "unfolding #{Atom.to_string(f)}/#{length(args)} into #{Macro.to_string(body)}"
+  end
+
   @spec list_context(Macro.t(), Macro.t()) :: String.t()
   def list_context(h, t) do
     "processing the list with head #{Macro.to_string(h)} and tail #{Macro.to_string(t)}"
@@ -69,9 +79,9 @@ defmodule Boogiex.Msg do
     "Could not start the tuple constructor agent: #{inspect(e)}"
   end
 
-  @spec undefined_user_function(atom(), [Macro.t()]) :: String.t()
-  def undefined_user_function(fun_name, args) do
-    "Undefined user function #{Atom.to_string(fun_name)}/#{length(args)}"
+  @spec undefined_function_body(atom(), [Macro.t()]) :: String.t()
+  def undefined_function_body(fun_name, args) do
+    "Undefined body for user function #{Atom.to_string(fun_name)}/#{length(args)}"
   end
 
   @spec body_expansion_does_not_hold(atom(), [Macro.t()]) :: String.t()

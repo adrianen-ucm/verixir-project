@@ -8,7 +8,7 @@ defmodule SmtLib.Syntax.From do
 
   @type ast :: Macro.t()
 
-  @spec command(ast()) :: S.command_t()
+  @spec command(ast()) :: S.command_t() | [S.command_t()]
   def command({:check_sat, _, []}) do
     :check_sat
   end

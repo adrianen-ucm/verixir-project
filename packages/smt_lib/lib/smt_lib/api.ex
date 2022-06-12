@@ -41,7 +41,7 @@ defmodule SmtLib.API do
     responses =
       commands
       |> Enum.map(fn c ->
-        Logger.debug(SmtLib.String.From.command(c))
+        Logger.debug(SmtLib.String.From.command(c), language: :smtlib)
         C.send_command(connection, c)
       end)
       |> Enum.map(fn r ->

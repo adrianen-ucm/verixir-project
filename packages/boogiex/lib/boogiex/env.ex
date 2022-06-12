@@ -1,27 +1,25 @@
 defmodule Boogiex.Env do
-  alias Boogiex.Theory
+  alias Boogiex.BuiltIn
   alias SmtLib.Connection
-  alias SmtLib.Syntax.From
   alias Boogiex.Msg
-  alias Boogiex.Env.Smt
-  alias Boogiex.Env.UserEnv
-  alias Boogiex.Theory.LitType
+  alias Boogiex.Lang.SmtLib
+  alias Boogiex.UserDefined
+  alias Boogiex.BuiltIn.LitType
   alias Boogiex.Error.EnvError
-  alias Boogiex.Theory.Function
-  alias Boogiex.Env.UserFunction
   alias Boogiex.Env.TupleConstructor
+  alias Boogiex.BuiltIn.Function, as: BuiltInFunction
+  alias Boogiex.UserDefined.Function, as: UserFunction
 
   @opaque t() :: %__MODULE__{
-            assumptions: [From.ast()],
-            user_env: UserEnv.t(),
+            user_defined: UserDefined.t(),
             connection: Connection.t(),
             tuple_constructor: TupleConstructor.t()
           }
-  defstruct [:assumptions, :user_env, :connection, :tuple_constructor]
+  defstruct [:user_defined, :connection, :tuple_constructor]
 
-  @spec new(Connection.t(), UserEnv.params()) :: t()
+  @spec new(Connection.t(), UserDefined.params()) :: t()
   def new(connection, params) do
-    user_env = UserEnv.new(params)
+    user_defined = UserDefined.new(params)
 
     tuple_constructor =
       with {:ok, tuple_constructor} <- TupleConstructor.start() do
@@ -33,25 +31,24 @@ defmodule Boogiex.Env do
       end
 
     env = %__MODULE__{
-      assumptions: [],
-      user_env: user_env,
+      user_defined: user_defined,
       connection: connection,
       tuple_constructor: tuple_constructor
     }
 
-    Smt.run(
-      env,
+    SmtLib.run(
+      connection,
       &Msg.initialize_smt_context/0,
-      Theory.init()
+      BuiltIn.init()
     )
 
-    Smt.run(
-      env,
+    SmtLib.run(
+      connection,
       &Msg.initialize_user_defined_context/0,
-      user_env
-      |> UserEnv.user_functions()
+      user_defined
+      |> UserDefined.functions()
       |> Enum.map(fn {name, arity} ->
-        Theory.declare_function(name, arity)
+        BuiltIn.declare_function(name, arity)
       end)
     )
 
@@ -67,16 +64,6 @@ defmodule Boogiex.Env do
     |> Connection.close()
   end
 
-  @spec add_assumption(t(), From.ast()) :: t()
-  def add_assumption(env, assumption) do
-    %__MODULE__{env | assumptions: [assumption | env.assumptions]}
-  end
-
-  @spec assumptions(t()) :: [From.ast()]
-  def assumptions(env) do
-    env.assumptions
-  end
-
   @spec connection(t()) :: SmtLib.Connection
   def connection(env) do
     env.connection
@@ -84,28 +71,28 @@ defmodule Boogiex.Env do
 
   @spec error(t(), term()) :: :ok
   def error(env, e) do
-    env.user_env.on_error.(e)
+    env.user_defined.on_error.(e)
   end
 
   @spec lit_type(t(), term()) :: LitType.t() | nil
   def lit_type(_, l) do
-    Theory.lit_type(l)
+    BuiltIn.lit_type(l)
   end
 
-  @spec function(t(), atom(), non_neg_integer()) :: Function.t() | nil
+  @spec function(t(), atom(), non_neg_integer()) :: BuiltInFunction.t() | nil
   def function(env, name, arity) do
-    with nil <- Theory.function(name, arity) do
-      with nil <- UserEnv.user_function(env.user_env, name, arity) do
+    with nil <- BuiltIn.function(name, arity) do
+      with nil <- UserDefined.function(env.user_defined, name, arity) do
         nil
       else
-        f -> %Function{name: f.name}
+        f -> %BuiltInFunction{name: f.name}
       end
     end
   end
 
   @spec user_function(t(), atom(), non_neg_integer()) :: UserFunction.t() | nil
   def user_function(env, name, arity) do
-    UserEnv.user_function(env.user_env, name, arity)
+    UserDefined.function(env.user_defined, name, arity)
   end
 
   @spec tuple_constructor(t(), non_neg_integer()) :: atom()
@@ -117,10 +104,10 @@ defmodule Boogiex.Env do
       )
 
     if fresh do
-      Smt.run(
-        env,
+      SmtLib.run(
+        connection(env),
         fn -> Msg.tuple_constructor_context(name) end,
-        Theory.declare_function(name, n)
+        BuiltIn.declare_function(name, n)
       )
     end
 

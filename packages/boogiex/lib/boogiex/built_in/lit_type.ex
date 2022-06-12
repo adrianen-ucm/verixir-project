@@ -1,4 +1,4 @@
-defmodule Boogiex.Theory.LitType do
+defmodule Boogiex.BuiltIn.LitType do
   @type t() :: %__MODULE__{
           is_type: atom(),
           type_val: atom(),

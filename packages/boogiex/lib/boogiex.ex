@@ -1,8 +1,8 @@
 defmodule Boogiex do
-  alias Boogiex.Stm
   alias Boogiex.Env
-  alias Boogiex.Exp
   alias Boogiex.Msg
+  alias Boogiex.Lang.L1Exp
+  alias Boogiex.Lang.L1Stm
   alias SmtLib.Connection.Z3, as: Default
 
   @type env :: Macro.t()
@@ -44,21 +44,21 @@ defmodule Boogiex do
     end
   end
 
-  @spec havoc(env(), Exp.ast()) :: Macro.t()
+  @spec havoc(env(), L1Exp.ast()) :: Macro.t()
   defmacro havoc(env, ast) do
     quote do
-      Stm.havoc(
+      L1Stm.havoc(
         unquote(env),
         unquote(Macro.escape(ast))
       )
     end
   end
 
-  @spec assume(env(), Exp.ast()) :: Macro.t()
-  @spec assume(env(), Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assume(env, ast, error_msg \\ quote(do: &Msg.assume_failed/0)) do
+  @spec assume(env(), L1Exp.ast()) :: Macro.t()
+  @spec assume(env(), L1Exp.ast(), Macro.t()) :: Macro.t()
+  defmacro assume(env, ast, error_msg \\ quote(do: Msg.assume_failed())) do
     quote do
-      Stm.assume(
+      L1Stm.assume(
         unquote(env),
         unquote(Macro.escape(ast)),
         unquote(error_msg)
@@ -66,11 +66,11 @@ defmodule Boogiex do
     end
   end
 
-  @spec assert(env(), Exp.ast()) :: Macro.t()
-  @spec assert(env(), Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assert(env, ast, error_msg \\ quote(do: &Msg.assert_failed/0)) do
+  @spec assert(env(), L1Exp.ast()) :: Macro.t()
+  @spec assert(env(), L1Exp.ast(), Macro.t()) :: Macro.t()
+  defmacro assert(env, ast, error_msg \\ quote(do: Msg.assert_failed())) do
     quote do
-      Stm.assert(
+      L1Stm.assert(
         unquote(env),
         unquote(Macro.escape(ast)),
         unquote(error_msg)
@@ -81,9 +81,20 @@ defmodule Boogiex do
   @spec block(env(), Macro.t()) :: Macro.t()
   defmacro block(env, do: body) do
     quote do
-      Stm.block(
-        unquote(env),
-        fn -> unquote(body) end
+      env = unquote(env)
+
+      Boogiex.Lang.SmtLib.run(
+        Env.connection(env),
+        Msg.block_context(),
+        quote(do: push)
+      )
+
+      unquote(body)
+
+      Boogiex.Lang.SmtLib.run(
+        Env.connection(env),
+        Msg.block_context(),
+        quote(do: pop)
       )
     end
   end
@@ -91,7 +102,7 @@ defmodule Boogiex do
   @spec unfold(env(), Macro.t()) :: Macro.t()
   defmacro unfold(env, {f, _, args}) do
     quote do
-      Stm.unfold(
+      L1Stm.unfold(
         unquote(env),
         unquote(Macro.escape(f)),
         unquote(Macro.escape(args))

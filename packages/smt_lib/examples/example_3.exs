@@ -13,9 +13,7 @@ defmodule L0 do
   end
 
   defmacro eval(_, {:skip, _, _}) do
-    quote do
-      nil
-    end
+    nil
   end
 
   defmacro eval(_, {:fail, _, _}) do
@@ -24,19 +22,11 @@ defmodule L0 do
     end
   end
 
-  defmacro eval(conn, {:seq, _, [e1, e2]}) do
-    quote do
-      conn = unquote(conn)
-      eval(conn, unquote(e1))
-      eval(conn, unquote(e2))
-    end
-  end
-
   defmacro eval(conn, {:local, _, [e]}) do
     quote do
       conn = unquote(conn)
       {_, :ok} = run(conn, push)
-      eval(conn, unquote(e))
+      eval conn, unquote(e)
       {_, :ok} = run(conn, pop)
     end
   end
@@ -59,14 +49,40 @@ defmodule L0 do
     quote do
       conn = unquote(conn)
       {_, :ok} = run(conn, push)
-      eval(conn, unquote(e1))
+      eval conn, unquote(e1)
       {_, {:ok, result}} = run(conn, check_sat)
       {_, :ok} = run(conn, pop)
 
       case result do
-        :unsat -> eval(conn, unquote(e2))
-        _ -> eval(conn, unquote(e3))
+        :unsat -> eval conn, unquote(e2)
+        _ -> eval conn, unquote(e3)
       end
+    end
+  end
+
+  defmacro eval(conn, do: {:__block__, [], es}) when is_list(es) do
+    quote do
+      conn = unquote(conn)
+      eval conn, unquote(es)
+    end
+  end
+
+  defmacro eval(conn, do: e) do
+    quote do
+      conn = unquote(conn)
+      eval conn, unquote(e)
+    end
+  end
+
+  defmacro eval(_, []) do
+    nil
+  end
+
+  defmacro eval(conn, [e | es]) do
+    quote do
+      conn = unquote(conn)
+      eval conn, unquote(e)
+      eval conn, unquote(es)
     end
   end
 
@@ -87,20 +103,16 @@ defmodule Main do
 
     init(conn)
 
-    eval(
-      conn,
-      when_unsat seq(
-                   declare_const(:x),
-                   # Succeeds
-                   add(:x != :x)
-                   # Fails
-                   # add(:x == :x)
-                 ) do
+    eval conn do
+      declare_const :x
+
+      # Replace '!=' by '=' to fail
+      when_unsat add :x != :x do
         skip
       else
         fail
       end
-    )
+    end
 
     C.close(conn)
   end

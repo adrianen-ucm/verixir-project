@@ -46,8 +46,8 @@ with_local_env(
   havoc d
   assume is_integer(d)
   unfold dup(d)
-  # assert is_integer(dup(d))
-  # assert dup(d) === 2 * d
+  assert is_integer(dup(d))
+  assert dup(d) === 2 * d
 
   assert false, "This should fail"
 end

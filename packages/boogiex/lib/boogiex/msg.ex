@@ -101,7 +101,7 @@ defmodule Boogiex.Msg do
 
   @spec no_precondition_holds(atom(), [Macro.t()]) :: String.t()
   def no_precondition_holds(fun_name, args) do
-    "No precondition #{Atom.to_string(fun_name)}/#{length(args)} holds"
+    "No precondition for #{Atom.to_string(fun_name)}/#{length(args)} holds"
   end
 
   @spec not_boolean(Macro.t()) :: String.t()
@@ -127,5 +127,20 @@ defmodule Boogiex.Msg do
   @spec assume_failed() :: String.t()
   def assume_failed() do
     "Assume failed"
+  end
+
+  @spec patter_does_not_match(Macro.t(), Macro.t()) :: String.t()
+  def patter_does_not_match(e, p) do
+    "#{Macro.to_string(e)} does not match the pattern #{Macro.to_string(p)}"
+  end
+
+  @spec no_pattern_holds(Macro.t()) :: String.t()
+  def no_pattern_holds(e) do
+    "No pattern holds in #{Macro.to_string(e)}"
+  end
+
+  @spec bad_previous_branch_to(Macro.t(), Macro.t()) :: String.t()
+  def bad_previous_branch_to(p, f) do
+    "Bad previous branch to #{Macro.to_string(p)} where #{Macro.to_string(f)}"
   end
 end

@@ -67,22 +67,10 @@ defmodule Boogiex.Lang.L0Exp do
   end
 
   defp eval_rec(conn, context, {:__block__, _, es}) do
-    eval_rec(conn, context, es)
-  end
-
-  defp eval_rec(conn, context, do: es) do
-    eval_rec(conn, context, es)
-  end
-
-  defp eval_rec(_, _, []) do
-    []
+    Enum.map(es, &eval_rec(conn, context, &1))
   end
 
   defp eval_rec(conn, _, {:context, _, [context, [do: es]]}) do
     eval_rec(conn, context, es)
-  end
-
-  defp eval_rec(conn, context, es) when is_list(es) do
-    Enum.map(es, &eval_rec(conn, context, &1))
   end
 end

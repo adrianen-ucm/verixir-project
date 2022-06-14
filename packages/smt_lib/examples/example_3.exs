@@ -60,29 +60,22 @@ defmodule L0 do
     end
   end
 
-  defmacro eval(conn, do: {:__block__, [], es}) when is_list(es) do
+  defmacro eval(conn, {:__block__, _, [e | es]}) do
     quote do
       conn = unquote(conn)
-      eval conn, unquote(es)
+      eval conn, unquote(e)
+      eval conn, unquote({:__block__, [], es})
     end
+  end
+
+  defmacro eval(_, {:__block__, _, []}) do
+    nil
   end
 
   defmacro eval(conn, do: e) do
     quote do
       conn = unquote(conn)
       eval conn, unquote(e)
-    end
-  end
-
-  defmacro eval(_, []) do
-    nil
-  end
-
-  defmacro eval(conn, [e | es]) do
-    quote do
-      conn = unquote(conn)
-      eval conn, unquote(e)
-      eval conn, unquote(es)
     end
   end
 
@@ -106,7 +99,7 @@ defmodule Main do
     eval conn do
       declare_const :x
 
-      # Replace '!=' by '=' to fail
+      # Replace '!=' by '==' to fail
       when_unsat add :x != :x do
         skip
       else

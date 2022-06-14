@@ -28,13 +28,13 @@ defmodule Boogiex.Lang.L1Exp do
     {
       term,
       quote do
-        unquote(arg_sems)
+        unquote_splicing(arg_sems)
 
         context unquote(fn -> Msg.tuple_context(args) end) do
           add :is_tuple.(unquote(term))
           add :tuple_size.(unquote(term)) == unquote(n)
 
-          unquote(
+          unquote_splicing(
             Enum.with_index(arg_terms, fn element, index ->
               quote do
                 add :elem.(unquote(term), unquote(index)) == unquote(element)
@@ -203,7 +203,7 @@ defmodule Boogiex.Lang.L1Exp do
       t,
       quote do
         context unquote(fn -> Msg.apply_context(fun_name, args) end) do
-          unquote(arg_sems)
+          unquote_splicing(arg_sems)
 
           when_unsat (
                        unquote(assumption)
@@ -219,10 +219,10 @@ defmodule Boogiex.Lang.L1Exp do
                            )
                      ) do
           else
-            fail Msg.no_precondition_holds(fun_name, args)
+            fail unquote(Msg.no_precondition_holds(fun_name, args))
           end
 
-          unquote(
+          unquote_splicing(
             Enum.map(function.specs, fn s ->
               quote do
                 when_unsat (
@@ -241,7 +241,7 @@ defmodule Boogiex.Lang.L1Exp do
   end
 
   def translate(_, _, {var_name, _, _}) do
-    {var_name, []}
+    {var_name, nil}
   end
 
   def translate(env, assumption, [{:|, _, [h, t]}]) do

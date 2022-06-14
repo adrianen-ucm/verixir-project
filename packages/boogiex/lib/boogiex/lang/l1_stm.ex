@@ -33,6 +33,10 @@ defmodule Boogiex.Lang.L1Stm do
     end
   end
 
+  def translate(env, {:assume, m, [f]}) do
+    translate(env, {:assume, m, [f, Msg.assume_failed()]})
+  end
+
   def translate(env, {:assume, _, [f, error]}) do
     {f_t, f_sem} = L1Exp.translate(env, f)
 
@@ -47,6 +51,10 @@ defmodule Boogiex.Lang.L1Stm do
         end
       end
     end
+  end
+
+  def translate(env, {:assert, m, [f]}) do
+    translate(env, {:assert, m, [f, Msg.assert_failed()]})
   end
 
   def translate(env, {:assert, _, [f, error]}) do
@@ -95,7 +103,7 @@ defmodule Boogiex.Lang.L1Stm do
           )
         )
 
-        unquote(
+        unquote_splicing(
           for spec <- function.specs do
             {pre_t, pre_sem} = L1Exp.translate(env, spec.pre.(args))
 
@@ -140,17 +148,13 @@ defmodule Boogiex.Lang.L1Stm do
     end
   end
 
-  def translate(env, nil) do
-    translate(env, [])
-  end
-
   def translate(env, {:__block__, _, es}) do
-    translate(env, es)
-  end
-
-  def translate(env, es) when is_list(es) do
-    for e <- es do
-      translate(env, e)
+    quote do
+      (unquote_splicing(
+         for e <- es do
+           translate(env, e)
+         end
+       ))
     end
   end
 end

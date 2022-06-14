@@ -47,33 +47,65 @@ defmodule Boogiex do
   @spec havoc(env(), L1Exp.ast()) :: Macro.t()
   defmacro havoc(env, ast) do
     quote do
-      L1Stm.havoc(
+      L1Stm.eval(
         unquote(env),
-        unquote(Macro.escape(ast))
+        unquote(
+          Macro.escape(
+            quote do
+              havoc unquote(ast)
+            end
+          )
+        )
       )
     end
   end
 
   @spec assume(env(), L1Exp.ast()) :: Macro.t()
   @spec assume(env(), L1Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assume(env, ast, error_msg \\ quote(do: Msg.assume_failed())) do
+  defmacro assume(env, ast, error_msg \\ Msg.assume_failed()) do
     quote do
-      L1Stm.assume(
+      L1Stm.eval(
         unquote(env),
-        unquote(Macro.escape(ast)),
-        unquote(error_msg)
+        unquote(
+          Macro.escape(
+            quote do
+              assume unquote(ast), unquote(error_msg)
+            end
+          )
+        )
       )
     end
   end
 
   @spec assert(env(), L1Exp.ast()) :: Macro.t()
   @spec assert(env(), L1Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assert(env, ast, error_msg \\ quote(do: Msg.assert_failed())) do
+  defmacro assert(env, ast, error_msg \\ Msg.assert_failed()) do
     quote do
-      L1Stm.assert(
+      L1Stm.eval(
         unquote(env),
-        unquote(Macro.escape(ast)),
-        unquote(error_msg)
+        unquote(
+          Macro.escape(
+            quote do
+              assert unquote(ast), unquote(error_msg)
+            end
+          )
+        )
+      )
+    end
+  end
+
+  @spec unfold(env(), Macro.t()) :: Macro.t()
+  defmacro unfold(env, ast) do
+    quote do
+      L1Stm.eval(
+        unquote(env),
+        unquote(
+          Macro.escape(
+            quote do
+              unfold unquote(ast)
+            end
+          )
+        )
       )
     end
   end
@@ -95,17 +127,6 @@ defmodule Boogiex do
         Env.connection(env),
         Msg.block_context(),
         quote(do: pop)
-      )
-    end
-  end
-
-  @spec unfold(env(), Macro.t()) :: Macro.t()
-  defmacro unfold(env, {f, _, args}) do
-    quote do
-      L1Stm.unfold(
-        unquote(env),
-        unquote(Macro.escape(f)),
-        unquote(Macro.escape(args))
       )
     end
   end

@@ -1,7 +1,7 @@
 defmodule Boogiex.Msg do
-  @spec evaluate_exp_context(Macro.t()) :: String.t()
-  def evaluate_exp_context(ast) do
-    "evaluating expression #{Macro.to_string(ast)}"
+  @spec evaluate_stm_context(Macro.t()) :: String.t()
+  def evaluate_stm_context(ast) do
+    "evaluating statement #{Macro.to_string(ast)}"
   end
 
   @spec havoc_context(Macro.t()) :: String.t()
@@ -121,11 +121,11 @@ defmodule Boogiex.Msg do
 
   @spec assert_failed() :: String.t()
   def assert_failed() do
-    "Assert_failed"
+    "Assert failed"
   end
 
   @spec assume_failed() :: String.t()
   def assume_failed() do
-    "Assume_failed"
+    "Assume failed"
   end
 end

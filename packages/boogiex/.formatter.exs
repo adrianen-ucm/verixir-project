@@ -9,6 +9,7 @@ locals_without_parens = [
   unfold: 1,
   fail: 1,
   add: 1,
+  local: 1,
   context: 2,
   declare_const: 1,
   when_unsat: 2

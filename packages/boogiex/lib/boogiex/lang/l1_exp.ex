@@ -6,26 +6,17 @@ defmodule Boogiex.Lang.L1Exp do
 
   @type ast :: Macro.t()
 
-  @spec eval(Env.t(), ast()) :: {L0Exp.ast(), [term()]}
-  def eval(env, e) do
-    {t, t_sem} = translate(env, nil, e)
-
-    {
-      t,
-      L0Exp.eval(
-        Env.connection(env),
-        fn -> Msg.evaluate_exp_context(e) end,
-        t_sem
-      )
-    }
+  @spec translate(Env.t(), ast()) :: {L0Exp.ast(), L0Exp.ast()}
+  def translate(env, e) do
+    translate(env, nil, e)
   end
 
   @spec translate(Env.t(), ast(), ast()) :: {L0Exp.ast(), L0Exp.ast()}
-  defp translate(env, assumption, t) when is_tuple(t) and tuple_size(t) < 3 do
+  def translate(env, assumption, t) when is_tuple(t) and tuple_size(t) < 3 do
     translate(env, assumption, {:{}, [], Tuple.to_list(t)})
   end
 
-  defp translate(env, assumption, {:{}, _, args}) do
+  def translate(env, assumption, {:{}, _, args}) do
     arg_results = Enum.map(args, &translate(env, assumption, &1))
     arg_terms = Enum.map(arg_results, &elem(&1, 0))
     arg_sems = Enum.map(arg_results, &elem(&1, 1))
@@ -67,7 +58,7 @@ defmodule Boogiex.Lang.L1Exp do
     }
   end
 
-  defp translate(env, assumption, {:or, _, [e1, e2]}) do
+  def translate(env, assumption, {:or, _, [e1, e2]}) do
     {t1, sem1} = translate(env, assumption, e1)
 
     {t2, sem2} =
@@ -131,7 +122,7 @@ defmodule Boogiex.Lang.L1Exp do
     }
   end
 
-  defp translate(env, assumption, {:and, _, [e1, e2]}) do
+  def translate(env, assumption, {:and, _, [e1, e2]}) do
     {t1, sem1} = translate(env, assumption, e1)
 
     {t2, sem2} =
@@ -195,7 +186,7 @@ defmodule Boogiex.Lang.L1Exp do
     }
   end
 
-  defp translate(env, assumption, {fun_name, _, args}) when is_list(args) do
+  def translate(env, assumption, {fun_name, _, args}) when is_list(args) do
     arg_results = Enum.map(args, &translate(env, assumption, &1))
     arg_terms = Enum.map(arg_results, &elem(&1, 0))
     arg_sems = Enum.map(arg_results, &elem(&1, 1))
@@ -249,11 +240,11 @@ defmodule Boogiex.Lang.L1Exp do
     }
   end
 
-  defp translate(_, _, {var_name, _, _}) do
+  def translate(_, _, {var_name, _, _}) do
     {var_name, []}
   end
 
-  defp translate(env, assumption, [{:|, _, [h, t]}]) do
+  def translate(env, assumption, [{:|, _, [h, t]}]) do
     {head, head_sem} = translate(env, assumption, h)
     {tail, tail_sem} = translate(env, assumption, t)
     list = quote(do: :cons.(unquote(head), unquote(tail)))
@@ -272,15 +263,15 @@ defmodule Boogiex.Lang.L1Exp do
     }
   end
 
-  defp translate(_, _, []) do
+  def translate(_, _, []) do
     {nil, nil}
   end
 
-  defp translate(env, assumption, [h | t]) do
+  def translate(env, assumption, [h | t]) do
     translate(env, assumption, [{:|, [], [h, t]}])
   end
 
-  defp translate(env, _, literal) do
+  def translate(env, _, literal) do
     lit_type =
       with nil <- Env.lit_type(env, literal) do
         raise EnvError,

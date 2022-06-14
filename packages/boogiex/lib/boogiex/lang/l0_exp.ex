@@ -28,6 +28,13 @@ defmodule Boogiex.Lang.L0Exp do
     []
   end
 
+  defp eval_rec(conn, context, {:local, _, [[do: e]]}) do
+    SmtLib.run(conn, context, quote(do: push))
+    errors = eval_rec(conn, context, e)
+    SmtLib.run(conn, context, quote(do: pop))
+    errors
+  end
+
   defp eval_rec(conn, context, {:when_unsat, m, [e1, [do: e2]]}) do
     eval_rec(conn, context, {:when_unsat, m, [e1, [do: e2, else: nil]]})
   end

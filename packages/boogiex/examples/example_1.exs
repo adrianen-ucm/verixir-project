@@ -32,6 +32,14 @@ with_local_env(
 
   assert is_integer(x), "This should fail"
 
+  block do
+    assume is_tuple({1, 2, 3})
+  end
+
+  block do
+    assume is_tuple({1, 2, 3})
+  end
+
   havoc a
   havoc b
   havoc c

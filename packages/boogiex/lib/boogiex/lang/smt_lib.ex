@@ -1,15 +1,15 @@
 defmodule Boogiex.Lang.SmtLib do
   alias SmtLib.API
-  alias SmtLib.Connection
+  alias Boogiex.Env
   alias SmtLib.Syntax.From
   alias Boogiex.Error.SmtError
 
   @type context :: String.t() | (() -> String.t())
 
-  @spec run(Connection.t(), context(), From.ast()) :: [term()]
-  def run(conn, context, commands) do
+  @spec run(Env.t(), context(), From.ast()) :: [term()]
+  def run(env, context, commands) do
     API.run(
-      conn,
+      Env.connection(env),
       From.commands(commands)
     )
     |> elem(1)

@@ -116,18 +116,22 @@ defmodule Boogiex do
       env = unquote(env)
 
       Boogiex.Lang.SmtLib.run(
-        Env.connection(env),
+        env,
         Msg.block_context(),
         quote(do: push)
       )
 
+      Env.on_push(env)
+
       unquote(body)
 
       Boogiex.Lang.SmtLib.run(
-        Env.connection(env),
+        env,
         Msg.block_context(),
         quote(do: pop)
       )
+
+      Env.on_pop(env)
     end
   end
 

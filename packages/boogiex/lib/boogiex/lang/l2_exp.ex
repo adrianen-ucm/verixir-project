@@ -14,9 +14,15 @@ defmodule Boogiex.Lang.L2Exp do
   def validate(env, e) do
     Logger.debug(Macro.to_string(e), language: :l2)
 
-    # TODO each one requires a fresh connection
     for {_, sem} <- translate(e) do
-      L1Stm.eval(env, sem)
+      L1Stm.eval(
+        env,
+        quote do
+          block do
+            unquote(sem)
+          end
+        end
+      )
     end
     |> List.flatten()
   end

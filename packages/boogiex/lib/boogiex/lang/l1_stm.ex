@@ -14,7 +14,7 @@ defmodule Boogiex.Lang.L1Stm do
 
     errors =
       L0Exp.eval(
-        Env.connection(env),
+        env,
         fn -> Msg.evaluate_stm_context(s) end,
         translate(env, s)
       )

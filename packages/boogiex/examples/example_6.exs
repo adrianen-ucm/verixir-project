@@ -15,11 +15,10 @@ L2Exp.validate(
       assert y === 3, "This does not hold"
     end
 
-    # TODO It requires a fix (refresh connections)
-    # case true do
-    #   true when false -> 1
-    #   true -> 3
-    # end
+    case true do
+      true when false -> 1
+      true -> 3
+    end
   end
 )
 

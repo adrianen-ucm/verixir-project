@@ -37,13 +37,13 @@ defmodule Boogiex.Env do
     }
 
     SmtLib.run(
-      connection,
+      env,
       &Msg.initialize_smt_context/0,
       BuiltIn.init()
     )
 
     SmtLib.run(
-      connection,
+      env,
       &Msg.initialize_user_defined_context/0,
       user_defined
       |> UserDefined.functions()
@@ -72,6 +72,16 @@ defmodule Boogiex.Env do
   @spec error(t(), term()) :: :ok
   def error(env, e) do
     env.user_defined.on_error.(e)
+  end
+
+  @spec on_push(t()) :: :ok
+  def on_push(env) do
+    TupleConstructor.push(env.tuple_constructor)
+  end
+
+  @spec on_pop(t()) :: :ok
+  def on_pop(env) do
+    TupleConstructor.pop(env.tuple_constructor)
   end
 
   @spec lit_type(t(), term()) :: LitType.t() | nil
@@ -105,7 +115,7 @@ defmodule Boogiex.Env do
 
     if fresh do
       SmtLib.run(
-        connection(env),
+        env,
         fn -> Msg.tuple_constructor_context(name) end,
         BuiltIn.declare_function(name, n)
       )

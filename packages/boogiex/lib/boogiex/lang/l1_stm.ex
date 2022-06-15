@@ -42,7 +42,7 @@ defmodule Boogiex.Lang.L1Stm do
 
     quote do
       context unquote(Msg.assume_context(f)) do
-        unquote(f_sem)
+        unquote_splicing([f_sem] |> Enum.reject(&is_nil/1))
 
         when_unsat add !:is_boolean.(unquote(f_t)) do
           add :boolean_val.(unquote(f_t))
@@ -62,7 +62,7 @@ defmodule Boogiex.Lang.L1Stm do
 
     quote do
       context unquote(Msg.assert_context(f)) do
-        unquote(f_sem)
+        unquote_splicing([f_sem] |> Enum.reject(&is_nil/1))
 
         when_unsat add !:is_boolean.(unquote(f_t)) do
         else
@@ -108,7 +108,7 @@ defmodule Boogiex.Lang.L1Stm do
             {pre_t, pre_sem} = L1Exp.translate(env, spec.pre.(args))
 
             quote do
-              unquote(pre_sem)
+              unquote_splicing([pre_sem] |> Enum.reject(&is_nil/1))
 
               when_unsat add !:is_boolean.(unquote(pre_t)) do
                 when_unsat add !:boolean_val.(unquote(pre_t)) do
@@ -150,7 +150,11 @@ defmodule Boogiex.Lang.L1Stm do
 
   def translate(env, {:__block__, _, es}) do
     quote do
-      (unquote_splicing(Enum.map(es, &translate(env, &1))))
+      (unquote_splicing(
+         es
+         |> Stream.map(&translate(env, &1))
+         |> Enum.reject(&is_nil/1)
+       ))
     end
   end
 end

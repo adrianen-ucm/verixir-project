@@ -35,7 +35,7 @@ defmodule Boogiex.Lang.L2Exp do
       {
         t,
         quote do
-          unquote(sem)
+          unquote_splicing([sem] |> Enum.reject(&is_nil/1))
 
           assert unquote(translate_match(p, e)),
                  unquote(Msg.patter_does_not_match(e, p))
@@ -69,8 +69,8 @@ defmodule Boogiex.Lang.L2Exp do
         {
           t_t,
           quote do
-            unquote(h_sem)
-            unquote(t_sem)
+            unquote_splicing([h_sem] |> Enum.reject(&is_nil/1))
+            unquote_splicing([t_sem] |> Enum.reject(&is_nil/1))
           end
         }
       end)
@@ -79,7 +79,6 @@ defmodule Boogiex.Lang.L2Exp do
 
   def translate({:case, _, [e, [do: bs]]} = ast) do
     Stream.flat_map(translate(e), fn {e_t, e_sem} ->
-      # TODO more efficient
       one_pattern_holds =
         Enum.reduce(bs, false, fn {:->, _, [[b], _]}, acc ->
           {pi, fi} =
@@ -122,7 +121,7 @@ defmodule Boogiex.Lang.L2Exp do
           {
             ei_t,
             quote do
-              unquote(e_sem)
+              unquote_splicing([e_sem] |> Enum.reject(&is_nil/1))
 
               assert unquote(one_pattern_holds),
                      unquote(Msg.no_pattern_holds(ast))
@@ -144,7 +143,7 @@ defmodule Boogiex.Lang.L2Exp do
               assume unquote(e_t) === unquote(pi),
                      unquote(Msg.patter_does_not_match(e_t, pi))
 
-              unquote(ei_sem)
+              unquote_splicing([ei_sem] |> Enum.reject(&is_nil/1))
             end
           }
         end)

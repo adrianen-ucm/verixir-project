@@ -28,7 +28,7 @@ defmodule Boogiex.Lang.L1Exp do
     {
       term,
       quote do
-        unquote_splicing(arg_sems)
+        unquote_splicing(arg_sems |> Enum.reject(&is_nil/1))
 
         context unquote(fn -> Msg.tuple_context(args) end) do
           add :is_tuple.(unquote(term))
@@ -65,7 +65,7 @@ defmodule Boogiex.Lang.L1Exp do
       translate(
         env,
         quote do
-          unquote(assumption)
+          unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
           add !:boolean_val.(unquote(t1))
         end,
         e2
@@ -77,31 +77,31 @@ defmodule Boogiex.Lang.L1Exp do
       t,
       quote do
         context unquote(fn -> Msg.or_context(e1, e2) end) do
-          unquote(sem1)
+          unquote_splicing([sem1] |> Enum.reject(&is_nil/1))
 
           when_unsat (
-                       unquote(assumption)
+                       unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                        add !:is_boolean.(unquote(t1))
                      ) do
             when_unsat (
-                         unquote(assumption)
+                         unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                          add !:boolean_val.(unquote(t1))
                        ) do
               add :is_boolean.(unquote(t))
               add :boolean_val.(unquote(t))
               add :boolean_val.(unquote(t1))
             else
-              unquote(sem2)
+              unquote_splicing([sem2] |> Enum.reject(&is_nil/1))
 
               when_unsat (
-                           unquote(assumption)
+                           unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                            add :boolean_val.(unquote(t1))
                          ) do
                 add !:boolean_val.(unquote(t1))
                 add unquote(t) == unquote(t2)
               else
                 when_unsat (
-                             unquote(assumption)
+                             unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                              add !:boolean_val.(unquote(t1))
                              add !:is_boolean.(unquote(t2))
                            ) do
@@ -129,7 +129,7 @@ defmodule Boogiex.Lang.L1Exp do
       translate(
         env,
         quote do
-          unquote(assumption)
+          unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
           add :boolean_val.(unquote(t1))
         end,
         e2
@@ -141,31 +141,31 @@ defmodule Boogiex.Lang.L1Exp do
       t,
       quote do
         context unquote(fn -> Msg.and_context(e1, e2) end) do
-          unquote(sem1)
+          unquote_splicing([sem1] |> Enum.reject(&is_nil/1))
 
           when_unsat (
-                       unquote(assumption)
+                       unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                        add !:is_boolean.(unquote(t1))
                      ) do
             when_unsat (
-                         unquote(assumption)
+                         unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                          add :boolean_val.(unquote(t1))
                        ) do
               add :is_boolean.(unquote(t))
               add !:boolean_val.(unquote(t))
               add !:boolean_val.(unquote(t1))
             else
-              unquote(sem2)
+              unquote_splicing([sem2] |> Enum.reject(&is_nil/1))
 
               when_unsat (
-                           unquote(assumption)
+                           unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                            add !:boolean_val.(unquote(t1))
                          ) do
                 add :boolean_val.(unquote(t1))
                 add unquote(t) == unquote(t2)
               else
                 when_unsat (
-                             unquote(assumption)
+                             unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                              add :boolean_val.(unquote(t1))
                              add !:is_boolean.(unquote(t2))
                            ) do
@@ -203,10 +203,10 @@ defmodule Boogiex.Lang.L1Exp do
       t,
       quote do
         context unquote(fn -> Msg.apply_context(fun_name, args) end) do
-          unquote_splicing(arg_sems)
+          unquote_splicing(arg_sems |> Enum.reject(&is_nil/1))
 
           when_unsat (
-                       unquote(assumption)
+                       unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
 
                        add !unquote(
                              Enum.reduce(
@@ -226,7 +226,7 @@ defmodule Boogiex.Lang.L1Exp do
             Enum.map(function.specs, fn s ->
               quote do
                 when_unsat (
-                             unquote(assumption)
+                             unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                              add !unquote(s.pre.(arg_terms))
                            ) do
                   add unquote(s.pre.(arg_terms))
@@ -253,8 +253,8 @@ defmodule Boogiex.Lang.L1Exp do
       list,
       quote do
         context unquote(fn -> Msg.list_context(h, t) end) do
-          unquote(head_sem)
-          unquote(tail_sem)
+          unquote_splicing([head_sem] |> Enum.reject(&is_nil/1))
+          unquote_splicing([tail_sem] |> Enum.reject(&is_nil/1))
           add :is_nonempty_list.(unquote(list))
           add :hd.(unquote(list)) == unquote(head)
           add :tl.(unquote(list)) == unquote(tail)

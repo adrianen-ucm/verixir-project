@@ -134,9 +134,9 @@ defmodule Boogiex.Msg do
     "#{Macro.to_string(e)} does not match the pattern #{Macro.to_string(p)}"
   end
 
-  @spec no_pattern_holds(Macro.t()) :: String.t()
-  def no_pattern_holds(e) do
-    "No pattern holds in #{Macro.to_string(e)}"
+  @spec no_case_pattern_holds_for(Macro.t()) :: String.t()
+  def no_case_pattern_holds_for(e) do
+    "No case pattern holds for #{Macro.to_string(e)}"
   end
 
   @spec bad_previous_branch_to(Macro.t(), Macro.t()) :: String.t()

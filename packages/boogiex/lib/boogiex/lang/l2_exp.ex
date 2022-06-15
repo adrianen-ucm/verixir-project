@@ -77,7 +77,7 @@ defmodule Boogiex.Lang.L2Exp do
     end)
   end
 
-  def translate({:case, _, [e, [do: bs]]} = ast) do
+  def translate({:case, _, [e, [do: bs]]}) do
     Stream.flat_map(translate(e), fn {e_t, e_sem} ->
       one_pattern_holds =
         Enum.reduce(bs, false, fn {:->, _, [[b], _]}, acc ->
@@ -94,59 +94,52 @@ defmodule Boogiex.Lang.L2Exp do
           )
         end)
 
-      Stream.flat_map(Enum.with_index(bs), fn {{:->, _, [[b], ei]}, i} ->
+      Stream.transform(bs, true, fn {:->, _, [[b], ei]}, previous_do_not_hold ->
         {pi, fi} =
           case b do
             {:when, [], [pi, fi]} -> {pi, fi}
             pi -> {pi, true}
           end
 
-        # TODO more efficient
-        previous_do_not_hold =
-          Enum.reduce(Enum.take(bs, i), true, fn {:->, _, [[b], _]}, acc ->
-            {pi, fi} =
-              case b do
-                {:when, [], [pi, fi]} -> {pi, fi}
-                pi -> {pi, true}
-              end
+        pattern_t = translate_match(pi, e_t)
 
-            quote(
-              do:
-                unquote(acc) and
-                  not (unquote(fi) and unquote(translate_match(pi, e_t)))
-            )
-          end)
+        {
+          Stream.map(translate(ei), fn {ei_t, ei_sem} ->
+            {
+              ei_t,
+              quote do
+                unquote_splicing([e_sem] |> Enum.reject(&is_nil/1))
 
-        Stream.map(translate(ei), fn {ei_t, ei_sem} ->
-          {
-            ei_t,
-            quote do
-              unquote_splicing([e_sem] |> Enum.reject(&is_nil/1))
+                assert unquote(one_pattern_holds),
+                       unquote(Msg.no_case_pattern_holds_for(e))
 
-              assert unquote(one_pattern_holds),
-                     unquote(Msg.no_pattern_holds(ast))
+                assume unquote(previous_do_not_hold),
+                       unquote(Msg.bad_previous_branch_to(pi, fi))
 
-              assume unquote(previous_do_not_hold),
-                     unquote(Msg.bad_previous_branch_to(pi, fi))
+                assume unquote(pattern_t) and unquote(fi),
+                       unquote(Msg.patter_does_not_match(e_t, pi))
 
-              assume unquote(translate_match(pi, e_t)) and unquote(fi),
-                     unquote(Msg.patter_does_not_match(e_t, pi))
-
-              unquote_splicing(
-                for var <- vars(pi) do
-                  quote do
-                    havoc unquote(var)
+                unquote_splicing(
+                  for var <- vars(pi) do
+                    quote do
+                      havoc unquote(var)
+                    end
                   end
-                end
-              )
+                )
 
-              assume unquote(e_t) === unquote(pi),
-                     unquote(Msg.patter_does_not_match(e_t, pi))
+                assume unquote(e_t) === unquote(pi),
+                       unquote(Msg.patter_does_not_match(e_t, pi))
 
-              unquote_splicing([ei_sem] |> Enum.reject(&is_nil/1))
-            end
-          }
-        end)
+                unquote_splicing([ei_sem] |> Enum.reject(&is_nil/1))
+              end
+            }
+          end),
+          quote(
+            do:
+              unquote(previous_do_not_hold) and
+                not (unquote(fi) and unquote(pattern_t))
+          )
+        }
       end)
     end)
   end
@@ -155,7 +148,7 @@ defmodule Boogiex.Lang.L2Exp do
     [
       {e,
        quote do
-         assert unquote(e) === unquote(e)
+         assert is_tuple({unquote(e)})
        end}
     ]
   end

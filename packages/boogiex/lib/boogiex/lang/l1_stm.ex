@@ -150,11 +150,7 @@ defmodule Boogiex.Lang.L1Stm do
 
   def translate(env, {:__block__, _, es}) do
     quote do
-      (unquote_splicing(
-         for e <- es do
-           translate(env, e)
-         end
-       ))
+      (unquote_splicing(Enum.map(es, &translate(env, &1))))
     end
   end
 end

@@ -6,9 +6,7 @@ defmodule Boogiex.Lang.L2Exp do
   alias Boogiex.Lang.L1Stm
 
   @type ast :: Macro.t()
-
-  # TODO use streams?
-  # TODO try this and provide examples
+  @type enum(value) :: [value] | Enumerable.t()
 
   @spec validate(Env.t(), ast()) :: [term()]
   def validate(env, e) do
@@ -27,13 +25,13 @@ defmodule Boogiex.Lang.L2Exp do
     |> List.flatten()
   end
 
-  @spec translate(ast()) :: [{L1Exp.ast(), L1Stm.ast()}]
+  @spec translate(ast()) :: enum({L1Exp.ast(), L1Stm.ast()})
   def translate({:ghost, _, [[do: s]]}) do
     [{[], s}]
   end
 
   def translate({:=, _, [p, e]}) do
-    for {t, sem} <- translate(e) do
+    Stream.map(translate(e), fn {t, sem} ->
       {
         t,
         quote do
@@ -54,7 +52,7 @@ defmodule Boogiex.Lang.L2Exp do
                  unquote(Msg.patter_does_not_match(e, p))
         end
       }
-    end
+    end)
   end
 
   def translate({:__block__, _, []}) do
@@ -66,8 +64,8 @@ defmodule Boogiex.Lang.L2Exp do
   end
 
   def translate({:__block__, _, [h | t]}) do
-    for {_, h_sem} <- translate(h) do
-      for {t_t, t_sem} <- translate({:__block__, [], t}) do
+    Stream.flat_map(translate(h), fn {_, h_sem} ->
+      Stream.map(translate({:__block__, [], t}), fn {t_t, t_sem} ->
         {
           t_t,
           quote do
@@ -75,13 +73,12 @@ defmodule Boogiex.Lang.L2Exp do
             unquote(t_sem)
           end
         }
-      end
-    end
-    |> List.flatten()
+      end)
+    end)
   end
 
   def translate({:case, _, [e, [do: bs]]} = ast) do
-    for {e_t, e_sem} <- translate(e) do
+    Stream.flat_map(translate(e), fn {e_t, e_sem} ->
       # TODO more efficient
       one_pattern_holds =
         Enum.reduce(bs, false, fn {:->, _, [[b], _]}, acc ->
@@ -98,7 +95,7 @@ defmodule Boogiex.Lang.L2Exp do
           )
         end)
 
-      for {{:->, _, [[b], ei]}, i} <- Enum.with_index(bs) do
+      Stream.flat_map(Enum.with_index(bs), fn {{:->, _, [[b], ei]}, i} ->
         {pi, fi} =
           case b do
             {:when, [], [pi, fi]} -> {pi, fi}
@@ -121,7 +118,7 @@ defmodule Boogiex.Lang.L2Exp do
             )
           end)
 
-        for {ei_t, ei_sem} <- translate(ei) do
+        Stream.map(translate(ei), fn {ei_t, ei_sem} ->
           {
             ei_t,
             quote do
@@ -150,10 +147,9 @@ defmodule Boogiex.Lang.L2Exp do
               unquote(ei_sem)
             end
           }
-        end
-      end
-    end
-    |> List.flatten()
+        end)
+      end)
+    end)
   end
 
   def translate(e) do
@@ -218,7 +214,7 @@ defmodule Boogiex.Lang.L2Exp do
     quote(do: unquote(e) === unquote(p))
   end
 
-  @spec vars(ast()) :: MapSet.t(atom())
+  @spec vars(ast()) :: MapSet.t(ast())
   defp vars(p) do
     Macro.prewalk(
       p,

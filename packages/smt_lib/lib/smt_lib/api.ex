@@ -4,7 +4,7 @@ defmodule SmtLib.API do
   """
 
   require Logger
-  alias SmtLib.Syntax, as: S
+  alias SmtLib.Syntax.From
   alias SmtLib.Connection, as: C
 
   @typedoc """
@@ -23,15 +23,15 @@ defmodule SmtLib.API do
           | {:error, term()}
 
   @doc """
-  Runs the given SMT-LIB commands as specified in `SmtLib.Syntax` and returns an
+  Runs the given SMT-LIB commands as specified in `SmtLib.Syntax.From` and returns an
   `state` with the result or results.
 
   It also requires a `state` which can be just an `SmtLib.Connection` or the `state`
   produced by a previous `run/2` call. In this later case, the final `state` contains
   also the result of the previous one.
   """
-  @spec run(state(), [S.command_t()]) :: state()
-  def run(state, commands) do
+  @spec run(state(), Macro.t()) :: state()
+  def run(state, ast) do
     {connection, results} =
       case state do
         {connection, results} -> {connection, List.wrap(results)}
@@ -39,7 +39,8 @@ defmodule SmtLib.API do
       end
 
     responses =
-      commands
+      ast
+      |> From.commands()
       |> Enum.map(fn c ->
         Logger.debug(SmtLib.String.From.command(c), language: :smtlib)
         C.send_command(connection, c)

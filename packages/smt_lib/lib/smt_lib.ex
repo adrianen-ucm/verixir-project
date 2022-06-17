@@ -54,12 +54,173 @@ defmodule SmtLib do
     quote do
       API.run(
         unquote(state),
-        unquote(
-          ast
-          |> From.commands()
-          |> Macro.escape()
-        )
+        unquote(Macro.escape(ast))
       )
+    end
+  end
+
+  @spec with_local_conn(Macro.t()) :: Macro.t()
+  defmacro with_local_conn(do: body) do
+    quote do
+      with_conn(
+        unquote(default_state()),
+        do: unquote(body)
+      )
+      |> close()
+    end
+  end
+
+  @spec with_conn(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro with_conn(conn, do: body) do
+    quote do
+      conn = unquote(conn)
+
+      result =
+        unquote(
+          Macro.prewalk(body, fn
+            {:check_sat, meta, a} when is_atom(a) -> {:check_sat, meta, [quote(do: conn)]}
+            {:check_sat, meta, []} -> {:check_sat, meta, [quote(do: conn)]}
+            {:assert, meta, [ast]} -> {:assert, meta, [quote(do: conn), ast]}
+            {:push, meta, a} when is_atom(a) -> {:push, meta, [quote(do: conn)]}
+            {:push, meta, []} -> {:push, meta, [quote(do: conn)]}
+            {:push, meta, [ast]} -> {:push, meta, [quote(do: conn), ast]}
+            {:pop, meta, a} when is_atom(a) -> {:pop, meta, [quote(do: conn)]}
+            {:pop, meta, []} -> {:pop, meta, [quote(do: conn)]}
+            {:pop, meta, [ast]} -> {:pop, meta, [quote(do: conn), ast]}
+            {:declare_const, meta, [ast]} -> {:declare_const, meta, [quote(do: conn), ast]}
+            {:declare_sort, meta, [ast]} -> {:declare_sort, meta, [quote(do: conn), ast]}
+            {:declare_fun, meta, [ast]} -> {:declare_fun, meta, [quote(do: conn), ast]}
+            {:define_fun, meta, [ast]} -> {:define_fun, meta, [quote(do: conn), ast]}
+            {:with_conn, _, _} = nested -> Macro.expand_once(nested, __CALLER__)
+            other -> other
+          end)
+        )
+
+      {conn, result}
+    end
+  end
+
+  @spec check_sat(Macro.t()) :: Macro.t()
+  defmacro check_sat(conn) do
+    quote do
+      API.run(
+        unquote(conn),
+        quote(do: check_sat)
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec assert(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro assert(conn, ast) do
+    quote do
+      ast = unquote(Macro.escape(ast))
+
+      API.run(
+        unquote(conn),
+        quote(do: assert(unquote(ast)))
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec push(Macro.t()) :: Macro.t()
+  defmacro push(conn) do
+    quote do
+      API.run(
+        unquote(conn),
+        quote(do: push)
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec push(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro push(conn, ast) do
+    quote do
+      ast = unquote(Macro.escape(ast))
+
+      API.run(
+        unquote(conn),
+        quote(do: push(unquote(ast)))
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec pop(Macro.t()) :: Macro.t()
+  defmacro pop(conn) do
+    quote do
+      API.run(
+        unquote(conn),
+        quote(do: pop)
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec pop(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro pop(conn, ast) do
+    quote do
+      ast = unquote(Macro.escape(ast))
+
+      API.run(
+        unquote(conn),
+        quote(do: pop(unquote(ast)))
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec declare_const(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro declare_const(conn, ast) do
+    quote do
+      ast = unquote(Macro.escape(ast))
+
+      API.run(
+        unquote(conn),
+        quote(do: declare_const(unquote(ast)))
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec declare_sort(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro declare_sort(conn, ast) do
+    quote do
+      ast = unquote(Macro.escape(ast))
+
+      API.run(
+        unquote(conn),
+        quote(do: declare_sort(unquote(ast)))
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec declare_fun(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro declare_fun(conn, ast) do
+    quote do
+      ast = unquote(Macro.escape(ast))
+
+      API.run(
+        unquote(conn),
+        quote(do: declare_fun(unquote(ast)))
+      )
+      |> elem(1)
+    end
+  end
+
+  @spec define_fun(Macro.t(), Macro.t()) :: Macro.t()
+  defmacro define_fun(conn, ast) do
+    quote do
+      ast = unquote(Macro.escape(ast))
+
+      API.run(
+        unquote(conn),
+        quote(do: define_fun(unquote(ast)))
+      )
+      |> elem(1)
     end
   end
 

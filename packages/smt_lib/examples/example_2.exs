@@ -1,6 +1,7 @@
 import SmtLib
 
-run do
+# Individual commands within Elixir code
+with_local_conn do
   # Common declarations
   declare_sort Term
 
@@ -13,8 +14,7 @@ run do
              :integer_val.(:integer_lit.(:x)) == :x,
            x: Int
          )
-end
-|> run do
+
   # havoc x, havoc result
   declare_const x: Term,
                 result: Term
@@ -59,9 +59,7 @@ end
   # assert result == 2 * x
   push
   assert :integer_val.(:result) != :integer_val.(:integer_lit.(2)) * :integer_val.(:x)
-  check_sat
+  check_sat |> IO.inspect()
   pop
   assert :integer_val.(:result) == :integer_val.(:integer_lit.(2)) * :integer_val.(:x)
 end
-|> close()
-|> IO.inspect()

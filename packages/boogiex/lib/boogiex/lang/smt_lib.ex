@@ -10,7 +10,7 @@ defmodule Boogiex.Lang.SmtLib do
   def run(env, context, commands) do
     API.run(
       Env.connection(env),
-      From.commands(commands)
+      commands
     )
     |> elem(1)
     |> List.wrap()

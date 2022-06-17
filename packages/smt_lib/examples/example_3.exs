@@ -6,9 +6,7 @@ defmodule L0 do
 
   defmacro init(conn) do
     quote do
-      run(unquote(conn)) do
-        declare_sort Term
-      end
+      :ok = declare_sort unquote(conn), Term
     end
   end
 
@@ -25,33 +23,31 @@ defmodule L0 do
   defmacro eval(conn, {:local, _, [e]}) do
     quote do
       conn = unquote(conn)
-      {_, :ok} = run(conn, push)
+      :ok = push conn
       eval conn, unquote(e)
-      {_, :ok} = run(conn, pop)
+      :ok = pop conn
     end
   end
 
   defmacro eval(conn, {:add, _, [f]}) do
     quote do
-      conn = unquote(conn)
-      {_, :ok} = run(conn, assert(unquote(f)))
+      :ok = assert unquote(conn), unquote(f)
     end
   end
 
   defmacro eval(conn, {:declare_const, _, [x]}) do
     quote do
-      conn = unquote(conn)
-      {_, :ok} = run(conn, declare_const([{unquote(x), Term}]))
+      :ok = declare_const unquote(conn), [{unquote(x), Term}]
     end
   end
 
   defmacro eval(conn, {:when_unsat, _, [e1, [do: e2, else: e3]]}) do
     quote do
       conn = unquote(conn)
-      {_, :ok} = run(conn, push)
+      :ok = push conn
       eval conn, unquote(e1)
-      {_, {:ok, result}} = run(conn, check_sat)
-      {_, :ok} = run(conn, pop)
+      {:ok, result} = check_sat(conn)
+      :ok = pop conn
 
       case result do
         :unsat -> eval conn, unquote(e2)

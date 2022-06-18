@@ -34,6 +34,9 @@ with_local_conn do
                 y: Int
 
   assert !((:x + 3 <= :y + 3) ~> (:x <= :y))
-  check_sat
+
+  case check_sat do
+    {:ok, :unsat} -> IO.puts("Verified!")
+    _ -> IO.puts("Not verified")
+  end
 end
-|> IO.inspect()

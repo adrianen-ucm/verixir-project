@@ -47,6 +47,10 @@ defmodule SmtLib.String.From do
       {:forall, sts, t} ->
         s_terms = Enum.map_join(sts, " ", &sorted_var/1)
         "(forall (#{s_terms}) #{term(t)})"
+
+      {:exists, sts, t} ->
+        s_terms = Enum.map_join(sts, " ", &sorted_var/1)
+        "(exists (#{s_terms}) #{term(t)})"
     end
   end
 

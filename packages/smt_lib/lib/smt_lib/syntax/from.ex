@@ -141,6 +141,10 @@ defmodule SmtLib.Syntax.From do
     s
   end
 
+  def symbol({:__aliases__, _, [s]}) when is_atom(s) do
+    s
+  end
+
   @spec sort(ast()) :: Macro.t()
   def sort(s) do
     quote do
@@ -149,17 +153,56 @@ defmodule SmtLib.Syntax.From do
   end
 
   @spec term(ast()) :: Macro.t()
-  def term({:forall, _, [e, vs = [_ | _]]}) do
+  def term(t) do
+    term(t, false)
+  end
+
+  @spec term(ast(), boolean()) :: Macro.t()
+  def term(s, _) when is_bitstring(s) do
+    quote do
+      {:constant, {:string, unquote(__MODULE__).string(unquote(s))}}
+    end
+  end
+
+  def term(n, _) when is_integer(n) do
+    quote do
+      {:constant, {:numeral, unquote(__MODULE__).numeral(unquote(n))}}
+    end
+  end
+
+  def term(s, _) when is_atom(s) do
+    quote do
+      {:identifier, {:simple, unquote(__MODULE__).symbol(unquote(s))}}
+    end
+  end
+
+  def term({:__aliases__, _, [s]}, _) when is_atom(s) do
+    quote do
+      {:identifier, {:simple, unquote(__MODULE__).symbol(unquote(s))}}
+    end
+  end
+
+  def term({:forall, _, [e, vs = [_ | _]]}, runtime) do
     quote do
       {
         :forall,
         unquote(Enum.map(vs, &sorted_var(&1))),
-        unquote(term(e))
+        unquote(term(e, runtime))
       }
     end
   end
 
-  def term({{:., _, [f]}, _, []}) do
+  def term({:exists, _, [e, vs = [_ | _]]}, runtime) do
+    quote do
+      {
+        :exists,
+        unquote(Enum.map(vs, &sorted_var(&1))),
+        unquote(term(e, runtime))
+      }
+    end
+  end
+
+  def term({{:., _, [f]}, _, []}, _) do
     quote do
       {
         :identifier,
@@ -168,51 +211,31 @@ defmodule SmtLib.Syntax.From do
     end
   end
 
-  def term({{:., _, [f]}, _, es = [_ | _]}) do
+  def term({{:., _, [f]}, _, es = [_ | _]}, runtime) do
     quote do
       {
         :app,
         {:simple, unquote(__MODULE__).symbol(unquote(f))},
-        unquote(Enum.map(es, &term(&1)))
+        unquote(Enum.map(es, &term(&1, runtime)))
       }
     end
   end
 
-  def term({f, _, es = [_ | _]}) when is_atom(f) do
+  def term({f, _, es = [_ | _]}, runtime) when is_atom(f) do
     quote do
       {
         :app,
         {:simple, unquote(infix(f))},
-        unquote(Enum.map(es, &term(&1)))
+        unquote(Enum.map(es, &term(&1, runtime)))
       }
     end
   end
 
-  def term(t) do
-    case t do
-      n when is_integer(n) ->
-        quote do
-          {:constant, {:numeral, unquote(numeral(n))}}
-        end
-
-      s when is_bitstring(s) ->
-        quote do
-          {:constant, {:numeral, unquote(string(s))}}
-        end
-
-      s when is_atom(s) ->
-        quote do
-          {:identifier, {:simple, unquote(symbol(s))}}
-        end
-
-      {name, _, m} when is_atom(name) and is_atom(m) ->
-        quote do
-          case unquote(t) do
-            n when is_integer(n) -> {:constant, {:numeral, unquote(__MODULE__).numeral(n)}}
-            s when is_bitstring(s) -> {:constant, {:numeral, unquote(__MODULE__).string(s)}}
-            s when is_atom(s) -> {:identifier, {:simple, unquote(__MODULE__).symbol(s)}}
-          end
-        end
+  def term(t, false) do
+    quote do
+      unquote(__MODULE__).term(unquote(t), true)
+      |> Code.eval_quoted()
+      |> elem(0)
     end
   end
 

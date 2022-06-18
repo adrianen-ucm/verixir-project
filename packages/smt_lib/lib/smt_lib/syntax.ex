@@ -25,6 +25,7 @@ defmodule SmtLib.Syntax do
           | {:identifier, identifier_t()}
           | {:app, identifier_t(), [term_t(), ...]}
           | {:forall, [sorted_var_t(), ...], term_t()}
+          | {:exists, [sorted_var_t(), ...], term_t()}
 
   @type command_t ::
           {:assert, term_t()}

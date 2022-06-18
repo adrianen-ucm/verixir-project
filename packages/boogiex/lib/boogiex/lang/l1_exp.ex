@@ -41,18 +41,6 @@ defmodule Boogiex.Lang.L1Exp do
               end
             end)
           )
-
-          add :term_size.(unquote(term)) ==
-                1 +
-                  unquote(
-                    Enum.reduce(
-                      arg_terms,
-                      0,
-                      fn element, a ->
-                        quote(do: unquote(a) + :term_size.(unquote(element)))
-                      end
-                    )
-                  )
         end
       end
     }

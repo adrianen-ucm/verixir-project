@@ -11,7 +11,6 @@ defmodule Boogiex.BuiltIn do
       declare_sort Type
 
       declare_fun type: Term :: Type,
-                  term_size: Term :: Int,
                   integer_val: Term :: Int,
                   boolean_val: Term :: Bool,
                   integer_lit: Int :: Term,
@@ -60,24 +59,6 @@ defmodule Boogiex.BuiltIn do
                   term_is_boolean: Term :: Term,
                   term_is_tuple: Term :: Term,
                   term_is_list: Term :: Term
-
-      assert :term_size.(nil) == 1
-
-      assert forall(
-               (:type.(:x) == :int) ~> (:term_size.(:x) == 1),
-               x: Term
-             )
-
-      assert forall(
-               (:type.(:x) == :bool) ~> (:term_size.(:x) == 1),
-               x: Term
-             )
-
-      assert forall(
-               (:type.(:x) == :nonempty_list)
-               ~> (:term_size.(:x) == 1 + :term_size.(:hd.(:x)) + :term_size.(:tl.(:x))),
-               x: Term
-             )
     end
   end
 
@@ -518,9 +499,7 @@ defmodule Boogiex.BuiltIn do
             quote(
               do:
                 :term_elem.(unquote(x), unquote(y)) ==
-                  :elem.(unquote(x), :integer_val.(unquote(y))) &&
-                  :term_size.(:elem.(unquote(x), :integer_val.(unquote(y)))) <
-                    :term_size.(unquote(x))
+                  :elem.(unquote(x), :integer_val.(unquote(y)))
             )
           end
         }

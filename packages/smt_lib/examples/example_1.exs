@@ -28,3 +28,12 @@ with_local_conn do
   check_sat
 end
 |> IO.inspect()
+
+with_local_conn do
+  declare_const x: Int,
+                y: Int
+
+  assert !((:x + 3 <= :y + 3) ~> (:x <= :y))
+  check_sat
+end
+|> IO.inspect()

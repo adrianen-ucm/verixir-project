@@ -2,7 +2,7 @@ alias Boogiex.Lang.L2Exp
 alias SmtLib.Connection.Z3
 alias Boogiex.Env
 
-env = Env.new(Z3.new(), on_error: &IO.inspect/1)
+env = Env.new(Z3.new())
 
 L2Exp.validate(
   env,

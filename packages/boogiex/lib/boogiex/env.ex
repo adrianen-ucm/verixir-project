@@ -17,8 +17,9 @@ defmodule Boogiex.Env do
           }
   defstruct [:user_defined, :connection, :tuple_constructor]
 
+  @spec new(Connection.t()) :: t()
   @spec new(Connection.t(), UserDefined.params()) :: t()
-  def new(connection, params) do
+  def new(connection, params \\ []) do
     user_defined = UserDefined.new(params)
 
     tuple_constructor =
@@ -67,11 +68,6 @@ defmodule Boogiex.Env do
   @spec connection(t()) :: SmtLib.Connection
   def connection(env) do
     env.connection
-  end
-
-  @spec error(t(), term()) :: :ok
-  def error(env, e) do
-    env.user_defined.on_error.(e)
   end
 
   @spec on_push(t()) :: :ok

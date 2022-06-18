@@ -8,17 +8,23 @@ defmodule SmtLib.Syntax.From do
 
   @type ast :: Macro.t()
 
-  @spec command(ast()) :: S.command_t() | [S.command_t()]
+  @spec command(ast()) :: Macro.t()
   def command({:check_sat, _, []}) do
-    :check_sat
+    quote do
+      :check_sat
+    end
   end
 
   def command({:check_sat, _, a}) when is_atom(a) do
-    :check_sat
+    quote do
+      :check_sat
+    end
   end
 
   def command({:assert, _, [t]}) do
-    {:assert, term(t)}
+    quote do
+      {:assert, unquote(term(t))}
+    end
   end
 
   def command({:push, _, args}) do
@@ -29,7 +35,9 @@ defmodule SmtLib.Syntax.From do
         a when is_atom(a) -> 1
       end
 
-    {:push, numeral(n)}
+    quote do
+      {:push, unquote(__MODULE__).numeral(unquote(n))}
+    end
   end
 
   def command({:pop, _, args}) do
@@ -40,13 +48,21 @@ defmodule SmtLib.Syntax.From do
         a when is_atom(a) -> 1
       end
 
-    {:pop, numeral(n)}
+    quote do
+      {:pop, unquote(__MODULE__).numeral(unquote(n))}
+    end
   end
 
   def command({:declare_const, _, [[_ | _] = vs]}) do
     commands =
       for {v, s} <- vs do
-        {:declare_const, symbol(v), sort(s)}
+        quote do
+          {
+            :declare_const,
+            unquote(__MODULE__).symbol(unquote(v)),
+            unquote(sort(s))
+          }
+        end
       end
 
     case commands do
@@ -62,18 +78,26 @@ defmodule SmtLib.Syntax.From do
         [s] -> [s, 0]
       end
 
-    {:declare_sort, symbol(s), numeral(n)}
+    quote do
+      {
+        :declare_sort,
+        unquote(__MODULE__).symbol(unquote(s)),
+        unquote(__MODULE__).numeral(unquote(n))
+      }
+    end
   end
 
   def command({:declare_fun, _, [[_ | _] = fs]}) do
     commands =
       for {f, {:"::", _, [ss, s]}} <- fs do
-        {
-          :declare_fun,
-          symbol(f),
-          Enum.map(List.wrap(ss), &sort(&1)),
-          sort(s)
-        }
+        quote do
+          {
+            :declare_fun,
+            unquote(__MODULE__).symbol(unquote(f)),
+            unquote(Enum.map(List.wrap(ss), &sort(&1))),
+            unquote(sort(s))
+          }
+        end
       end
 
     case commands do
@@ -85,13 +109,15 @@ defmodule SmtLib.Syntax.From do
   def command({:define_fun, _, [[_ | _] = fs]}) do
     commands =
       for {f, {:<-, _, [{:"::", _, [ss, s]}, t]}} <- fs do
-        {
-          :define_fun,
-          symbol(f),
-          Enum.map(List.wrap(ss), &sorted_var(&1)),
-          sort(s),
-          term(t)
-        }
+        quote do
+          {
+            :define_fun,
+            unquote(__MODULE__).symbol(unquote(f)),
+            unquote(Enum.map(List.wrap(ss), &sorted_var(&1))),
+            unquote(sort(s)),
+            unquote(term(t))
+          }
+        end
       end
 
     case commands do
@@ -100,96 +126,129 @@ defmodule SmtLib.Syntax.From do
     end
   end
 
-  @spec numeral(ast()) :: S.numeral_t()
+  @spec numeral(non_neg_integer()) :: S.numeral_t()
   def numeral(n) when is_integer(n) do
     n
   end
 
-  @spec string(ast()) :: S.string_t()
+  @spec string(String.t()) :: S.string_t()
   def string(s) when is_bitstring(s) do
     s
   end
 
-  @spec symbol(ast()) :: S.symbol_t()
+  @spec symbol(atom()) :: S.symbol_t()
   def symbol(s) when is_atom(s) do
     s
   end
 
-  def symbol({:__aliases__, _, [s]}) when is_atom(s) do
-    s
-  end
-
-  @spec sort(ast()) :: S.sort_t()
+  @spec sort(ast()) :: Macro.t()
   def sort(s) do
-    {:sort, {:simple, symbol(s)}}
+    quote do
+      {:sort, {:simple, unquote(__MODULE__).symbol(unquote(s))}}
+    end
   end
 
-  @spec term(ast()) :: S.term_t()
-  def term(s) when is_bitstring(s) do
-    {:constant, {:string, string(s)}}
-  end
-
-  def term(n) when is_integer(n) do
-    {:constant, {:numeral, numeral(n)}}
-  end
-
+  @spec term(ast()) :: Macro.t()
   def term({:forall, _, [e, vs = [_ | _]]}) do
-    {
-      :forall,
-      Enum.map(vs, &sorted_var(&1)),
-      term(e)
-    }
+    quote do
+      {
+        :forall,
+        unquote(Enum.map(vs, &sorted_var(&1))),
+        unquote(term(e))
+      }
+    end
   end
 
   def term({{:., _, [f]}, _, []}) do
-    {
-      :identifier,
-      {:simple, symbol(f)}
-    }
+    quote do
+      {
+        :identifier,
+        {:simple, unquote(__MODULE__).symbol(unquote(f))}
+      }
+    end
   end
 
   def term({{:., _, [f]}, _, es = [_ | _]}) do
-    {
-      :app,
-      {:simple, symbol(f)},
-      Enum.map(es, &term(&1))
-    }
+    quote do
+      {
+        :app,
+        {:simple, unquote(__MODULE__).symbol(unquote(f))},
+        unquote(Enum.map(es, &term(&1)))
+      }
+    end
   end
 
   def term({f, _, es = [_ | _]}) when is_atom(f) do
-    {
-      :app,
-      {:simple, infix(f)},
-      Enum.map(es, &term(&1))
-    }
+    quote do
+      {
+        :app,
+        {:simple, unquote(infix(f))},
+        unquote(Enum.map(es, &term(&1)))
+      }
+    end
   end
 
-  def term(v) do
-    {:identifier, {:simple, symbol(v)}}
+  def term(t) do
+    case t do
+      n when is_integer(n) ->
+        quote do
+          {:constant, {:numeral, unquote(numeral(n))}}
+        end
+
+      s when is_bitstring(s) ->
+        quote do
+          {:constant, {:numeral, unquote(string(s))}}
+        end
+
+      s when is_atom(s) ->
+        quote do
+          {:identifier, {:simple, unquote(symbol(s))}}
+        end
+
+      {name, _, m} when is_atom(name) and is_atom(m) ->
+        quote do
+          case unquote(t) do
+            n when is_integer(n) -> {:constant, {:numeral, unquote(__MODULE__).numeral(n)}}
+            s when is_bitstring(s) -> {:constant, {:numeral, unquote(__MODULE__).string(s)}}
+            s when is_atom(s) -> {:identifier, {:simple, unquote(__MODULE__).symbol(s)}}
+          end
+        end
+    end
   end
 
-  @spec sorted_var(ast()) :: S.sorted_var_t()
+  @spec sorted_var(ast()) :: Macro.t()
   def sorted_var({v, {:__aliases__, _, [s]}}) do
-    {
-      symbol(v),
-      {:sort, {:simple, symbol(s)}}
-    }
+    quote do
+      {
+        unquote(__MODULE__).symbol(unquote(v)),
+        {:sort, {:simple, unquote(__MODULE__).symbol(unquote(s))}}
+      }
+    end
   end
 
   def sorted_var({v, s}) do
-    {
-      symbol(v),
-      {:sort, {:simple, symbol(s)}}
-    }
+    quote do
+      {
+        unquote(__MODULE__).symbol(unquote(v)),
+        {:sort, {:simple, unquote(__MODULE__).symbol(unquote(s))}}
+      }
+    end
   end
 
-  @spec commands(ast()) :: [S.command_t()]
+  @spec commands_data(ast()) :: [S.command_t()]
+  def commands_data(ast) do
+    commands(ast)
+    |> Code.eval_quoted()
+    |> elem(0)
+  end
+
+  @spec commands(ast()) :: Macro.t()
   def commands(ast) do
     List.flatten(commands_rec(ast))
   end
 
   @spec commands_rec(ast()) :: deep_command_list
-        when deep_command_list: [S.command_t() | deep_command_list]
+        when deep_command_list: [Macro.t() | deep_command_list]
   defp commands_rec(ast) do
     case ast do
       nil -> []

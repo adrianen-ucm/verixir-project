@@ -9,7 +9,16 @@ defmodule Boogiex.Lang.L0Exp do
   @spec eval(Env.t(), SmtLib.context(), ast()) :: [term()]
   def eval(env, context, e) do
     Logger.debug(Macro.to_string(e), language: :l0)
-    eval_rec(env, context, e) |> List.flatten()
+
+    errors =
+      eval_rec(env, context, e)
+      |> List.flatten()
+
+    for e <- errors do
+      Logger.error("Verification: #{e}", language: :l0)
+    end
+
+    errors
   end
 
   @spec eval_rec(Env.t(), SmtLib.context(), ast()) :: deep_error_list

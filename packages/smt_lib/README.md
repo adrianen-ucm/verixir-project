@@ -26,44 +26,51 @@ The `SmtLib` module offers a DSL which translates in compile time
 to the low level machinery. It tries to be flexible enough to 
 support different use cases.
 
-This is an execution of single commands with
-their results gathered:
+This is an execution of executing commands one at a time:
 
 ```elixir
-run(declare_const x: Bool)
-|> run(assert :x && !:x)
-|> run(check_sat)
-|> close()
+with_local_conn do
+  declare_const x: Bool
+  assert :x && !:x
+  check_sat
+end
+|> IO.inspect()
 
-# [:ok, :ok, {:ok, :unsat}]
+# {:ok, :unsat}
 ```
 
 This other one is the same but with error short-circuit:
 
 ```elixir
-with {connection, :ok} <- run(declare_const x: Bool),
-     {connection, :ok} <- run(connection, assert(:x && !:x)),
-     {connection, {:ok, result}} <- run(connection, check_sat),
-     :ok <- close(connection) do
-  result
+with_local_conn do
+  with :ok <- declare_const(x: Bool),
+       :ok <- assert(:x && !:x),
+       {:ok, result} <- check_sat do
+    result
+  end
 end
+|> IO.inspect()
 
 # :unsat
 ```
 
-And this last one shows how a block of commands is grouped
-into a sequence of commands to be executed in batch:
+Identifiers and literals from commands can be parameterized:
 
 ```elixir
-run do
-  declare_const x: Bool
-  assert :x && !:x
+var_name = :x
+var_sort = Bool
+
+with_local_conn do
+  declare_const [{var_name, var_sort}]
+  assert var_name && !var_name
   check_sat
 end
-|> close()
+|> IO.inspect()
 
-# [:ok, :ok, {:ok, :unsat}]
+# {:ok, :unsat}
 ```
+
+Also, by using the `SmtLib.API` module instead of the macros exposed in `SmtLib`, commands can be processed in batch and get the benefit of some parallelism when interacting with the solver.
 
 ## Other SMT-LIB interpreters
 

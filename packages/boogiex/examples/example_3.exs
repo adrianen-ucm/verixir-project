@@ -1,6 +1,6 @@
 import Boogiex
 
-with_local_env(on_error: &IO.inspect/1) do
+with_local_env do
   assert is_tuple({1, 2})
 
   assert tuple_size({}) === 0

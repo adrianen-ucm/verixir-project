@@ -2,24 +2,21 @@ defmodule Boogiex.UserDefined do
   alias Boogiex.UserDefined.Function
 
   @type params :: [
-          on_error: (term() -> any()),
           functions: [Function.t()]
         ]
 
   @type t() :: %__MODULE__{
-          on_error: (term() -> any()),
           functions: %{{atom(), non_neg_integer()} => Function.t()}
         }
-  defstruct [:on_error, :functions]
+  defstruct [:functions]
 
+  @spec new() :: t()
   @spec new(params()) :: t()
-  def new(params) do
-    Keyword.validate!(params, [:on_error, :functions])
-    {on_error, params} = Keyword.pop(params, :on_error, fn _ -> nil end)
+  def new(params \\ []) do
+    Keyword.validate!(params, [:functions])
     {functions, []} = Keyword.pop(params, :functions, [])
 
     %__MODULE__{
-      on_error: on_error,
       functions:
         functions
         |> Enum.map(&{{&1.name, &1.arity}, &1})

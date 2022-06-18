@@ -12,16 +12,11 @@ defmodule Boogiex.Lang.L1Stm do
   def eval(env, s) do
     Logger.debug(Macro.to_string(s), language: :l1)
 
-    errors =
-      L0Exp.eval(
-        env,
-        fn -> Msg.evaluate_stm_context(s) end,
-        translate(env, s)
-      )
-
-    Enum.each(errors, &Env.error(env, &1))
-
-    errors
+    L0Exp.eval(
+      env,
+      fn -> Msg.evaluate_stm_context(s) end,
+      translate(env, s)
+    )
   end
 
   @spec translate(Env.t(), ast()) :: L0Exp.ast()

@@ -11,12 +11,18 @@ defmodule Boogiex do
   @spec with_local_env(config(), Macro.t()) :: Macro.t()
   defmacro with_local_env(config \\ [], do: body) do
     quote do
-      with_env(
+      env =
         Default.new()
-        |> Env.new(unquote(config)),
-        do: unquote(body)
-      )
-      |> clear()
+        |> Env.new(unquote(config))
+
+      result =
+        with_env(
+          env,
+          do: unquote(body)
+        )
+
+      clear(env)
+      result
     end
   end
 
@@ -25,22 +31,49 @@ defmodule Boogiex do
     quote do
       env = unquote(env)
 
-      result =
-        unquote(
-          Macro.prewalk(body, fn
-            {:havoc, meta, [name]} -> {:havoc, meta, [quote(do: env), name]}
-            {:assume, meta, [ast]} -> {:assume, meta, [quote(do: env), ast]}
-            {:assume, meta, [ast, error]} -> {:assume, meta, [quote(do: env), ast, error]}
-            {:assert, meta, [ast]} -> {:assert, meta, [quote(do: env), ast]}
-            {:assert, meta, [ast, error]} -> {:assert, meta, [quote(do: env), ast, error]}
-            {:block, meta, [body]} -> {:block, meta, [quote(do: env), body]}
-            {:unfold, meta, [ast]} -> {:unfold, meta, [quote(do: env), ast]}
-            {:with_env, _, _} = nested -> Macro.expand_once(nested, __CALLER__)
-            other -> other
-          end)
-        )
+      unquote(
+        Macro.traverse(
+          body,
+          0,
+          fn
+            {:havoc, meta, [name]}, 0 ->
+              {{:havoc, meta, [quote(do: env), name]}, 0}
 
-      {env, result}
+            {:assume, meta, [ast]}, 0 ->
+              {{:assume, meta, [quote(do: env), ast]}, 0}
+
+            {:assume, meta, [ast, error]}, 0 ->
+              {{:assume, meta, [quote(do: env), ast, error]}, 0}
+
+            {:assert, meta, [ast]}, 0 ->
+              {{:assert, meta, [quote(do: env), ast]}, 0}
+
+            {:assert, meta, [ast, error]}, 0 ->
+              {{:assert, meta, [quote(do: env), ast, error]}, 0}
+
+            {:block, meta, [body]}, 0 ->
+              {{:block, meta, [quote(do: env), body]}, 0}
+
+            {:unfold, meta, [ast]}, 0 ->
+              {{:unfold, meta, [quote(do: env), ast]}, 0}
+
+            {:with_local_env, _, _} = ast, n ->
+              {ast, n + 1}
+
+            {:with_env, _, _} = ast, n ->
+              {ast, n + 1}
+
+            other, n ->
+              {other, n}
+          end,
+          fn
+            {:with_local_env, _, _} = ast, n -> {ast, n - 1}
+            {:with_env, _, _} = ast, n -> {ast, n - 1}
+            other, n -> {other, n}
+          end
+        )
+      )
+      |> elem(0)
     end
   end
 
@@ -136,17 +169,9 @@ defmodule Boogiex do
   end
 
   @spec clear(Macro.t()) :: Macro.t()
-  defmacro clear(result) do
+  defmacro clear(env) do
     quote do
-      case unquote(result) do
-        {env, result} ->
-          Env.clear(env)
-          result
-
-        env ->
-          Env.clear(env)
-          :ok
-      end
+      Env.clear(unquote(env))
     end
   end
 end

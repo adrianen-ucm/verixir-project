@@ -9,7 +9,6 @@ defmodule Example do
   end
 
   with_local_env(
-    on_error: &IO.inspect/1,
     functions:
       Module.get_attribute(
         __MODULE__,

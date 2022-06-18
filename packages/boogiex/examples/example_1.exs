@@ -8,10 +8,7 @@ dup = %Boogiex.UserDefined.Function{
   end
 }
 
-with_local_env(
-  on_error: &IO.inspect/1,
-  functions: [dup]
-) do
+with_local_env(functions: [dup]) do
   assert 4 - 2 === 6 - 4
 
   assert 2 === 1 + 1

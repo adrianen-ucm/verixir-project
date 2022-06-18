@@ -93,6 +93,8 @@ defmodule SmtLib.String.From do
   @spec symbol(S.symbol_t()) :: String.t()
   def symbol(s) do
     Atom.to_string(s)
+    |> String.split(".")
+    |> List.last()
   end
 
   @spec string(S.string_t()) :: String.t()

@@ -4,7 +4,7 @@ alias Boogiex.Env
 
 env = Env.new(Z3.new())
 
-L2Exp.validate(
+L2Exp.verify(
   env,
   quote do
     [] = []
@@ -13,6 +13,12 @@ L2Exp.validate(
 
     ghost do
       assert y === 3, "y is not 3"
+    end
+
+    case true do
+      # true when false -> 1
+      # x -> x and x
+      x when x -> x
     end
 
     case true do

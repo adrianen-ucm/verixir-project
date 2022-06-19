@@ -129,8 +129,8 @@ defmodule Boogiex.Msg do
     "Assume failed"
   end
 
-  @spec patter_does_not_match(Macro.t(), Macro.t()) :: String.t()
-  def patter_does_not_match(e, p) do
+  @spec pattern_does_not_match(Macro.t(), Macro.t()) :: String.t()
+  def pattern_does_not_match(e, p) do
     "#{Macro.to_string(e)} does not match the pattern #{Macro.to_string(p)}"
   end
 
@@ -142,5 +142,10 @@ defmodule Boogiex.Msg do
   @spec bad_previous_branch_to(Macro.t(), Macro.t()) :: String.t()
   def bad_previous_branch_to(p, f) do
     "Bad previous branch to #{Macro.to_string(p)} where #{Macro.to_string(f)}"
+  end
+
+  @spec free_var_in_ssa(atom()) :: String.t()
+  def free_var_in_ssa(v) do
+    "Applying SSA to a program with the free variable #{v}. The result may be inconsistent."
   end
 end

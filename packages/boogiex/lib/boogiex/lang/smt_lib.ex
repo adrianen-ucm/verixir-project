@@ -10,7 +10,9 @@ defmodule Boogiex.Lang.SmtLib do
   def run(env, context, commands) do
     API.run(
       Env.connection(env),
-      From.commands_data(commands)
+      From.commands(commands)
+      |> Code.eval_quoted()
+      |> elem(0)
     )
     |> List.wrap()
     |> Enum.map(fn

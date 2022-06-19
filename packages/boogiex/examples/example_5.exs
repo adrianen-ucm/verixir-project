@@ -11,5 +11,8 @@ with_local_env do
   assume is_integer(x) and x + 1 === 2
   assert x === 1
 
+  havoc z
+  assert not (true === z) or z
+
   assert false, "This should fail"
 end

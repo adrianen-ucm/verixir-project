@@ -95,8 +95,9 @@ defmodule Boogiex.Lang.L1Exp do
                            ) do
                   add :is_boolean.(unquote(t))
 
-                  add :boolean_val.(unquote(t)) == :boolean_val.(unquote(t1)) ||
-                        :boolean_val.(unquote(t2))
+                  add :boolean_val.(unquote(t)) ==
+                        (:boolean_val.(unquote(t1)) ||
+                           :boolean_val.(unquote(t2)))
                 else
                   fail unquote(Msg.not_boolean(e2))
                 end
@@ -159,8 +160,9 @@ defmodule Boogiex.Lang.L1Exp do
                            ) do
                   add :is_boolean.(unquote(t))
 
-                  add :boolean_val.(unquote(t)) == :boolean_val.(unquote(t1)) &&
-                        :boolean_val.(unquote(t2))
+                  add :boolean_val.(unquote(t)) ==
+                        (:boolean_val.(unquote(t1)) &&
+                           :boolean_val.(unquote(t2)))
                 else
                   fail unquote(Msg.not_boolean(e2))
                 end

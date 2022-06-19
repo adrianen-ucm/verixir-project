@@ -19,14 +19,16 @@ with_local_conn do
 
   # Every node is at least in some position
   for n <- nodes do
-    assert Enum.reduce(
-             Enum.with_index(nodes),
-             quote(do: false),
-             fn {_, i}, acc ->
-               quote do
-                 unquote(acc) || unquote(node_in_position[{n, i}])
+    assert unquote(
+             Enum.reduce(
+               Enum.with_index(nodes),
+               quote(do: false),
+               fn {_, i}, acc ->
+                 quote do
+                   unquote(acc) || unquote(node_in_position[{n, i}])
+                 end
                end
-             end
+             )
            )
   end
 

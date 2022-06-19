@@ -4,15 +4,16 @@ defmodule Boogiex.Lang.L2Exp do
   alias Boogiex.Msg
   alias Boogiex.Lang.L1Exp
   alias Boogiex.Lang.L1Stm
+  alias Boogiex.Lang.L2Var
 
   @type ast :: Macro.t()
   @type enum(value) :: [value] | Enumerable.t()
 
-  @spec validate(Env.t(), ast()) :: [term()]
-  def validate(env, e) do
+  @spec verify(Env.t(), ast()) :: [term()]
+  def verify(env, e) do
     Logger.debug(Macro.to_string(e), language: :l2)
 
-    for {_, sem} <- translate(e) do
+    for {_, sem} <- translate(L2Var.ssa(e)) do
       L1Stm.eval(
         env,
         quote do
@@ -38,10 +39,10 @@ defmodule Boogiex.Lang.L2Exp do
           unquote_splicing([sem] |> Enum.reject(&is_nil/1))
 
           assert unquote(translate_match(p, e)),
-                 unquote(Msg.patter_does_not_match(e, p))
+                 unquote(Msg.pattern_does_not_match(e, p))
 
           unquote_splicing(
-            for var <- vars(p) do
+            for var <- L2Var.vars(p) do
               quote do
                 havoc unquote(var)
               end
@@ -49,7 +50,7 @@ defmodule Boogiex.Lang.L2Exp do
           )
 
           assume unquote(t) === unquote(p),
-                 unquote(Msg.patter_does_not_match(e, p))
+                 unquote(Msg.pattern_does_not_match(e, p))
         end
       }
     end)
@@ -93,19 +94,23 @@ defmodule Boogiex.Lang.L2Exp do
 
   def translate({:case, _, [e, [do: bs]]}) do
     Stream.flat_map(translate(e), fn {e_t, e_sem} ->
-      one_pattern_holds =
-        Enum.reduce(bs, false, fn {:->, _, [[b], _]}, acc ->
+      {all_pattern_vars, one_pattern_holds} =
+        Enum.reduce(bs, {MapSet.new(), false}, fn {:->, _, [[b], _]}, {vs, acc} ->
           {pi, fi} =
             case b do
               {:when, [], [pi, fi]} -> {pi, fi}
               pi -> {pi, true}
             end
 
-          quote(
-            do:
-              unquote(acc) or
-                (unquote(fi) and unquote(translate_match(pi, e_t)))
-          )
+          {
+            MapSet.union(vs, L2Var.vars(pi)),
+            quote(
+              do:
+                unquote(acc) or
+                  (unquote(translate_match(pi, e_t)) and
+                     (not (unquote(e_t) === unquote(pi)) or unquote(fi)))
+            )
+          }
         end)
 
       Stream.transform(bs, true, fn {:->, _, [[b], ei]}, previous_do_not_hold ->
@@ -124,25 +129,25 @@ defmodule Boogiex.Lang.L2Exp do
               quote do
                 unquote_splicing([e_sem] |> Enum.reject(&is_nil/1))
 
-                assert unquote(one_pattern_holds),
-                       unquote(Msg.no_case_pattern_holds_for(e))
-
-                assume unquote(previous_do_not_hold),
-                       unquote(Msg.bad_previous_branch_to(pi, fi))
-
-                assume unquote(pattern_t) and unquote(fi),
-                       unquote(Msg.patter_does_not_match(e_t, pi))
-
                 unquote_splicing(
-                  for var <- vars(pi) do
+                  for var <- all_pattern_vars do
                     quote do
                       havoc unquote(var)
                     end
                   end
                 )
 
+                assert unquote(one_pattern_holds),
+                       unquote(Msg.no_case_pattern_holds_for(e))
+
+                assume unquote(previous_do_not_hold),
+                       unquote(Msg.bad_previous_branch_to(pi, fi))
+
+                assume unquote(pattern_t) and (not (unquote(e_t) === unquote(pi)) or unquote(fi)),
+                       unquote(Msg.pattern_does_not_match(e_t, pi))
+
                 assume unquote(e_t) === unquote(pi),
-                       unquote(Msg.patter_does_not_match(e_t, pi))
+                       unquote(Msg.pattern_does_not_match(e_t, pi))
 
                 unquote_splicing([ei_sem] |> Enum.reject(&is_nil/1))
               end
@@ -151,7 +156,7 @@ defmodule Boogiex.Lang.L2Exp do
           quote(
             do:
               unquote(previous_do_not_hold) and
-                not (unquote(fi) and unquote(pattern_t))
+                not (unquote(pattern_t) and (not (unquote(e_t) === unquote(pi)) or unquote(fi)))
           )
         }
       end)
@@ -218,21 +223,5 @@ defmodule Boogiex.Lang.L2Exp do
 
   defp translate_match(p, e) do
     quote(do: unquote(e) === unquote(p))
-  end
-
-  @spec vars(ast()) :: MapSet.t(ast())
-  defp vars(p) do
-    Macro.prewalk(
-      p,
-      MapSet.new(),
-      fn
-        {var_name, _, m} = c, vs when is_atom(var_name) and is_atom(m) ->
-          {c, MapSet.put(vs, {var_name, [], nil})}
-
-        other_ast, other_acc ->
-          {other_ast, other_acc}
-      end
-    )
-    |> elem(1)
   end
 end

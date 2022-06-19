@@ -12,12 +12,16 @@ L2Exp.validate(
     # 3 + true
 
     ghost do
-      assert y === 3, "This does not hold"
+      assert y === 3, "y is not 3"
     end
 
     case true do
       true when false -> 1
       true -> 3
+    end
+
+    ghost do
+      assert y === 2, "y is not 2"
     end
   end
 )

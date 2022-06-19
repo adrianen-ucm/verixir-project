@@ -63,18 +63,32 @@ defmodule Boogiex.Lang.L2Exp do
     ]
   end
 
-  def translate({:__block__, _, [h | t]}) do
-    Stream.flat_map(translate(h), fn {_, h_sem} ->
-      Stream.map(translate({:__block__, [], t}), fn {t_t, t_sem} ->
-        {
-          t_t,
-          quote do
-            unquote_splicing([h_sem] |> Enum.reject(&is_nil/1))
-            unquote_splicing([t_sem] |> Enum.reject(&is_nil/1))
-          end
-        }
-      end)
-    end)
+  def translate({:__block__, _, [h | t] = es}) do
+    case List.pop_at(es, -1) do
+      {{:ghost, _, [[do: s]]}, es} ->
+        Stream.map(translate({:__block__, [], es}), fn {es_t, es_sem} ->
+          {
+            es_t,
+            quote do
+              unquote_splicing([es_sem] |> Enum.reject(&is_nil/1))
+              unquote_splicing([s] |> Enum.reject(&is_nil/1))
+            end
+          }
+        end)
+
+      _ ->
+        Stream.flat_map(translate(h), fn {_, h_sem} ->
+          Stream.map(translate({:__block__, [], t}), fn {t_t, t_sem} ->
+            {
+              t_t,
+              quote do
+                unquote_splicing([h_sem] |> Enum.reject(&is_nil/1))
+                unquote_splicing([t_sem] |> Enum.reject(&is_nil/1))
+              end
+            }
+          end)
+        end)
+    end
   end
 
   def translate({:case, _, [e, [do: bs]]}) do

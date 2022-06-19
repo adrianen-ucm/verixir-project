@@ -1,7 +1,4 @@
 defmodule Verixir do
-  alias Boogiex.UserDefined.Function
-  alias Boogiex.UserDefined.Spec
-
   @spec __using__([]) :: Macro.t()
   defmacro __using__(_) do
     quote do
@@ -12,7 +9,7 @@ defmodule Verixir do
       Module.register_attribute(
         __MODULE__,
         @verification_functions_key,
-        accumulate: true
+        accumulate: false
       )
 
       Module.register_attribute(
@@ -20,95 +17,147 @@ defmodule Verixir do
         @verifier_key,
         accumulate: true
       )
+
+      @before_compile unquote(__MODULE__)
     end
   end
 
-  @spec spec(Macro.t()) :: {:spec, Macro.t()}
-  defmacro spec(args) do
-    {:spec, Macro.escape(args)}
+  @spec requires(Macro.t()) :: {:requires, Macro.t()}
+  defmacro requires(args) do
+    {:requires, Macro.escape(args)}
   end
 
-  @spec defv(Macro.t()) :: Macro.t()
+  @spec ensures(Macro.t()) :: {:ensures, Macro.t()}
+  defmacro ensures(args) do
+    {:ensures, Macro.escape(args)}
+  end
+
   @spec defv(Macro.t(), do: Macro.t()) :: Macro.t()
-  defmacro defv({name, _, args}, keyword \\ []) do
+  defmacro defv(ast, do: body) do
+    {name, args, guard} =
+      case ast do
+        {:when, _, [{name, _, args}, guard]} -> {name, args, guard}
+        {name, _, args} -> {name, args, true}
+      end
+
     quote do
+      verifier =
+        with nil <-
+               Module.delete_attribute(
+                 __MODULE__,
+                 @verifier_key
+               ) do
+          []
+        end
+
+      verification_functions =
+        with nil <-
+               Module.delete_attribute(
+                 __MODULE__,
+                 @verification_functions_key
+               ) do
+          %{}
+        end
+
+      {pre, verifier} = Keyword.pop(verifier, :requires, true)
+      {post, verifier} = Keyword.pop(verifier, :ensures, true)
+
+      # TODO use a struct?
+      function = {
+        pre,
+        post,
+        unquote(Macro.escape(body)),
+        unquote(Macro.escape(args)),
+        unquote(Macro.escape(guard))
+      }
+
+      # TODO take into account that they are reversed
+      verification_functions =
+        Map.update(
+          verification_functions,
+          {unquote(name), unquote(length(args))},
+          [function],
+          fn defs -> [function | defs] end
+        )
+
       Module.put_attribute(
         __MODULE__,
         @verification_functions_key,
-        defv_no_macro(
-          unquote(name),
-          unquote(length(args)),
-          unquote(replacer_for(args)),
-          unquote(Macro.escape(Keyword.get(keyword, :do))),
-          Module.delete_attribute(
-            __MODULE__,
-            @verifier_key
-          )
-        )
+        verification_functions
       )
+
+      # TODO remove ghosts
+      def unquote(name)(unquote_splicing(args)) when unquote(guard) do
+        unquote(body)
+      end
     end
   end
 
-  # TODO refactor
-  def defv_no_macro(name, arity, replacer, body, attributes) do
-    specs =
-      for {:spec, spec} <- with(nil <- attributes, do: []) do
-        user_spec = %Spec{}
-
-        user_spec =
-          case Keyword.get(spec, :requires) do
-            nil -> user_spec
-            requires -> %Spec{user_spec | pre: replacer.(requires)}
-          end
-
-        user_spec =
-          case Keyword.get(spec, :ensures) do
-            nil -> user_spec
-            ensures -> %Spec{user_spec | post: replacer.(ensures)}
-          end
-
-        user_spec
-      end
-
-    body =
-      case body do
-        nil ->
-          nil
-
-        body ->
-          replacer.(body)
-      end
-
-    %Function{
-      name: name,
-      arity: arity,
-      specs: specs,
-      body: body
-    }
-  end
-
-  # TODO study variable capturing problems
-  defp replacer_for(vars) do
-    var_names = Enum.map(vars, &elem(&1, 0))
-
+  defmacro __before_compile__(_) do
     quote do
-      fn exp ->
-        fn unquote(vars) ->
-          vals =
-            Stream.zip(
-              unquote(var_names),
-              unquote(vars)
-            )
-            |> Enum.into(%{})
+      verification_functions =
+        with nil <-
+               Module.delete_attribute(
+                 __MODULE__,
+                 @verification_functions_key
+               ) do
+          %{}
+        end
 
-          Macro.prewalk(
-            exp,
-            fn
-              {name, _, _} = var -> Map.get(vals, name, var)
-              other -> other
+      for {{name, arity}, defs} <- verification_functions do
+        IO.puts("Verifying #{name}/#{arity}")
+
+        # TODO take into account that they are reversed
+        defs = Enum.reverse(defs)
+
+        # TODO introduce the user definitions
+        env = Boogiex.Env.new(SmtLib.Connection.Z3.new())
+
+        # TODO, hardcoded
+        fresh_vars = [Macro.var(:f1, __MODULE__)]
+
+        # TODO find a better way to build this AST
+        errors =
+          Boogiex.Lang.L2Exp.verify(
+            env,
+            quote do
+              ghost(do: havoc(res))
+
+              (unquote_splicing(
+                 for v <- fresh_vars do
+                   quote do
+                     ghost(do: havoc(unquote(v)))
+                   end
+                 end
+               ))
+
+              unquote({
+                :case,
+                [],
+                [
+                  quote(do: {unquote_splicing(fresh_vars)}),
+                  [
+                    do:
+                      List.flatten([
+                        for {pre, post, body, args, guard} <- defs do
+                          quote do
+                            {unquote_splicing(args)} when unquote(pre) and unquote(guard) ->
+                              res = unquote(body)
+                              ghost(do: assert(unquote(post)))
+                          end
+                        end,
+                        quote do
+                          {unquote_splicing(fresh_vars)} -> true
+                        end
+                      ])
+                  ]
+                ]
+              })
             end
           )
-        end
+
+        Enum.each(errors, &IO.puts/1)
+        Boogiex.Env.clear(env)
       end
     end
   end

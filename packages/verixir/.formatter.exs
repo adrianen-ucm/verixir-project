@@ -1,5 +1,6 @@
 locals_without_parens = [
-  spec: 1
+  requires: 1,
+  ensures: 1
 ]
 
 [

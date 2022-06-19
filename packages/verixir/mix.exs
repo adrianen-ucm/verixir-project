@@ -16,6 +16,7 @@ defmodule Verixir.MixProject do
 
   defp deps do
     [
+      {:smt_lib, in_umbrella: true},
       {:boogiex, in_umbrella: true},
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:dialyxir, "~> 1.0", only: :dev, runtime: false}

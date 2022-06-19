@@ -1,26 +1,20 @@
 defmodule Example do
   use Verixir
-  import Boogiex
 
-  @verifier spec requires: is_integer(x),
-                 ensures: is_integer(dup(x))
-  defv dup(x) do
+  @verifier requires is_integer(x)
+  @verifier ensures res === 2 * x
+  defv dup(x) when is_integer(x) do
     x + x
   end
 
-  with_local_env(
-    functions:
-      Module.get_attribute(
-        __MODULE__,
-        @verification_functions_key
-      )
-  ) do
-    havoc d
-    assume is_integer(d)
-    unfold dup(d)
-    assert is_integer(dup(d))
-    assert dup(d) === 2 * d
+  @verifier ensures not is_integer(res)
+  defv dup(y) do
+    y
+  end
 
-    assert false, "This should fail"
+  def main() do
+    IO.puts("Using the defined function: dup(3) is #{dup(3)}")
   end
 end
+
+Example.main()

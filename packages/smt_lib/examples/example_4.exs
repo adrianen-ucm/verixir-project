@@ -13,8 +13,8 @@ node_in_position =
 
 with_local_conn do
   # Declare the variables
-  for n <- nodes, {_, i} <- Enum.with_index(nodes) do
-    declare_const [{node_in_position[{n, i}], Bool}]
+  for {_, v} <- node_in_position do
+    declare_const [{v, Bool}]
   end
 
   # Every node is at least in some position
@@ -31,17 +31,17 @@ with_local_conn do
   end
 
   # Nodes do not collide in their positions
-  for m <- nodes, n <- nodes, n !== m, {_, i} <- Enum.with_index(nodes) do
-    assert !(node_in_position[{m, i}] && node_in_position[{n, i}])
+  for {{m, i}, v1} <- node_in_position, {{n, ^i}, v2} <- node_in_position, n !== m do
+    assert !(v1 && v2)
   end
 
   # Non adjacent nodes cannot be in adjacent positions
-  for m <- nodes,
-      n <- nodes,
+  for {{m, i}, v1} <- node_in_position,
+      j <- [i + 1],
+      {{n, ^j}, v2} <- node_in_position,
       n !== m,
-      not ({m, n} in edges or {n, m} in edges),
-      {_, i} <- Enum.with_index(Enum.drop(nodes, 1)) do
-    assert node_in_position[{m, i}] ~> !node_in_position[{n, i + 1}]
+      {m, n} not in edges do
+    assert v1 ~> !v2
   end
 
   check_sat

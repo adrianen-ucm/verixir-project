@@ -1,16 +1,39 @@
-defmodule Boogiex.Lang.L2Var do
+defmodule Boogiex.Lang.L2Code do
   require Logger
   alias Boogiex.Msg
+  alias Boogiex.Env
+  alias Boogiex.Lang.L1Stm
   alias Boogiex.Lang.L2Exp
 
-  @typep state :: any()
+  @typep ssa_state :: any()
+
+  @spec verify(Env.t(), L2Exp.ast()) :: [term()]
+  def verify(env, e) do
+    Logger.debug(Macro.to_string(e), language: :l2)
+
+    for {_, sem} <-
+          L2Exp.translate(
+            Env.user_defined(env),
+            ssa(e)
+          ) do
+      L1Stm.eval(
+        env,
+        quote do
+          block do
+            unquote(sem)
+          end
+        end
+      )
+    end
+    |> List.flatten()
+  end
 
   @spec ssa(L2Exp.ast()) :: L2Exp.ast()
   def ssa(e) do
     ssa_rec(e, {%{}, %{}}) |> elem(0)
   end
 
-  @spec ssa_rec(L2Exp.ast(), state()) :: {L2Exp.ast(), state()}
+  @spec ssa_rec(L2Exp.ast(), ssa_state()) :: {L2Exp.ast(), ssa_state()}
   defp ssa_rec({var_name, _, m} = ast, {_, version_stack} = state)
        when is_atom(var_name) and is_atom(m) do
     case version_stack[var_name] do
@@ -112,6 +135,28 @@ defmodule Boogiex.Lang.L2Var do
     {e, state}
   end
 
+  @spec remove_ghost(L2Exp.ast()) :: L2Exp.ast()
+  def remove_ghost(ast) do
+    Macro.prewalk(ast, fn
+      {:__block__, meta, es} ->
+        {:__block__, meta,
+         Enum.reject(es, fn
+           {:unfold, _, _} -> true
+           {:ghost, _, _} -> true
+           _ -> false
+         end)}
+
+      {:unfold, _, _} ->
+        nil
+
+      {:ghost, _, _} ->
+        nil
+
+      other ->
+        other
+    end)
+  end
+
   @spec var_names(L2Exp.ast()) :: MapSet.t(atom())
   def var_names(p) do
     MapSet.new(vars(p), &elem(&1, 0))
@@ -133,7 +178,7 @@ defmodule Boogiex.Lang.L2Var do
     |> elem(1)
   end
 
-  @spec new_version_for_vars(Enumerable.t(), state()) :: state()
+  @spec new_version_for_vars(Enumerable.t(), ssa_state()) :: ssa_state()
   defp new_version_for_vars(var_names, state) do
     Enum.reduce(
       var_names,

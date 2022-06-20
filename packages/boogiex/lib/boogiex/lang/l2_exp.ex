@@ -1,55 +1,14 @@
 defmodule Boogiex.Lang.L2Exp do
   require Logger
-  alias Boogiex.Env
   alias Boogiex.Msg
   alias Boogiex.Lang.L1Exp
   alias Boogiex.Lang.L1Stm
-  alias Boogiex.Lang.L2Var
+  alias Boogiex.Lang.L2Code
   alias Boogiex.UserDefined
   alias Boogiex.Error.EnvError
 
   @type ast :: Macro.t()
   @type enum(value) :: [value] | Enumerable.t()
-
-  @spec verify(Env.t(), ast()) :: [term()]
-  def verify(env, e) do
-    Logger.debug(Macro.to_string(e), language: :l2)
-
-    for {_, sem} <- translate(Env.user_defined(env), L2Var.ssa(e)) do
-      L1Stm.eval(
-        env,
-        quote do
-          block do
-            unquote(sem)
-          end
-        end
-      )
-    end
-    |> List.flatten()
-  end
-
-  # TODO refactor
-  @spec remove_ghost_code(ast()) :: ast()
-  def remove_ghost_code(ast) do
-    Macro.prewalk(ast, fn
-      {:__block__, meta, es} ->
-        {:__block__, meta,
-         Enum.reject(es, fn
-           {:unfold, _, _} -> true
-           {:ghost, _, _} -> true
-           _ -> false
-         end)}
-
-      {:unfold, _, _} ->
-        nil
-
-      {:ghost, _, _} ->
-        nil
-
-      other ->
-        other
-    end)
-  end
 
   def translate(_, {:ghost, _, [[do: s]]}) do
     [{[], s}]
@@ -66,7 +25,7 @@ defmodule Boogiex.Lang.L2Exp do
                  unquote(Msg.pattern_does_not_match(e, p))
 
           unquote_splicing(
-            for var <- L2Var.vars(p) do
+            for var <- L2Code.vars(p) do
               quote do
                 havoc unquote(var)
               end
@@ -127,7 +86,7 @@ defmodule Boogiex.Lang.L2Exp do
             end
 
           {
-            MapSet.union(vs, L2Var.vars(pi)),
+            MapSet.union(vs, L2Code.vars(pi)),
             quote(
               do:
                 unquote(acc) or
@@ -207,8 +166,7 @@ defmodule Boogiex.Lang.L2Exp do
                  quote do
                    {unquote_splicing(d.args)}
                    when unquote(d.pre) and unquote(d.guard) ->
-                     # TODO remove ghost body to avoid infinite unfold loops?
-                     res = unquote(remove_ghost_code(d.body))
+                     res = unquote(L2Code.remove_ghost(d.body))
 
                      ghost do
                        assume res === unquote(f)(unquote_splicing(args))

@@ -5,6 +5,8 @@ defmodule Boogiex.Lang.L2Exp do
   alias Boogiex.Lang.L1Exp
   alias Boogiex.Lang.L1Stm
   alias Boogiex.Lang.L2Var
+  alias Boogiex.UserDefined
+  alias Boogiex.Error.EnvError
 
   @type ast :: Macro.t()
   @type enum(value) :: [value] | Enumerable.t()
@@ -13,7 +15,7 @@ defmodule Boogiex.Lang.L2Exp do
   def verify(env, e) do
     Logger.debug(Macro.to_string(e), language: :l2)
 
-    for {_, sem} <- translate(L2Var.ssa(e)) do
+    for {_, sem} <- translate(Env.user_defined(env), L2Var.ssa(e)) do
       L1Stm.eval(
         env,
         quote do
@@ -26,13 +28,35 @@ defmodule Boogiex.Lang.L2Exp do
     |> List.flatten()
   end
 
-  @spec translate(ast()) :: enum({L1Exp.ast(), L1Stm.ast()})
-  def translate({:ghost, _, [[do: s]]}) do
+  # TODO refactor
+  @spec remove_ghost_code(ast()) :: ast()
+  def remove_ghost_code(ast) do
+    Macro.prewalk(ast, fn
+      {:__block__, meta, es} ->
+        {:__block__, meta,
+         Enum.reject(es, fn
+           {:unfold, _, _} -> true
+           {:ghost, _, _} -> true
+           _ -> false
+         end)}
+
+      {:unfold, _, _} ->
+        nil
+
+      {:ghost, _, _} ->
+        nil
+
+      other ->
+        other
+    end)
+  end
+
+  def translate(_, {:ghost, _, [[do: s]]}) do
     [{[], s}]
   end
 
-  def translate({:=, _, [p, e]}) do
-    Stream.map(translate(e), fn {t, sem} ->
+  def translate(user_defined, {:=, _, [p, e]}) do
+    Stream.map(translate(user_defined, e), fn {t, sem} ->
       {
         t,
         quote do
@@ -56,7 +80,7 @@ defmodule Boogiex.Lang.L2Exp do
     end)
   end
 
-  def translate({:__block__, _, []}) do
+  def translate(_, {:__block__, _, []}) do
     [
       {[],
        quote do
@@ -64,10 +88,10 @@ defmodule Boogiex.Lang.L2Exp do
     ]
   end
 
-  def translate({:__block__, _, [h | t] = es}) do
+  def translate(user_defined, {:__block__, _, [h | t] = es}) do
     case List.pop_at(es, -1) do
       {{:ghost, _, [[do: s]]}, es} ->
-        Stream.map(translate({:__block__, [], es}), fn {es_t, es_sem} ->
+        Stream.map(translate(user_defined, {:__block__, [], es}), fn {es_t, es_sem} ->
           {
             es_t,
             quote do
@@ -78,8 +102,8 @@ defmodule Boogiex.Lang.L2Exp do
         end)
 
       _ ->
-        Stream.flat_map(translate(h), fn {_, h_sem} ->
-          Stream.map(translate({:__block__, [], t}), fn {t_t, t_sem} ->
+        Stream.flat_map(translate(user_defined, h), fn {_, h_sem} ->
+          Stream.map(translate(user_defined, {:__block__, [], t}), fn {t_t, t_sem} ->
             {
               t_t,
               quote do
@@ -92,8 +116,8 @@ defmodule Boogiex.Lang.L2Exp do
     end
   end
 
-  def translate({:case, _, [e, [do: bs]]}) do
-    Stream.flat_map(translate(e), fn {e_t, e_sem} ->
+  def translate(user_defined, {:case, _, [e, [do: bs]]}) do
+    Stream.flat_map(translate(user_defined, e), fn {e_t, e_sem} ->
       {all_pattern_vars, one_pattern_holds} =
         Enum.reduce(bs, {MapSet.new(), false}, fn {:->, _, [[b], _]}, {vs, acc} ->
           {pi, fi} =
@@ -123,7 +147,7 @@ defmodule Boogiex.Lang.L2Exp do
         pattern_t = translate_match(pi, e_t)
 
         {
-          Stream.map(translate(ei), fn {ei_t, ei_sem} ->
+          Stream.map(translate(user_defined, ei), fn {ei_t, ei_sem} ->
             {
               ei_t,
               quote do
@@ -163,7 +187,42 @@ defmodule Boogiex.Lang.L2Exp do
     end)
   end
 
-  def translate(e) do
+  @spec translate(UserDefined.t(), ast()) :: enum({L1Exp.ast(), L1Stm.ast()})
+  def translate(user_defined, {:unfold, _, [{f, _, args}]}) do
+    defs =
+      with nil <- UserDefined.function_defs(user_defined, f, length(args)) do
+        raise EnvError,
+          message: Msg.undefined_user_defined_function(f, args)
+      end
+
+    translate(
+      user_defined,
+      {:case, [],
+       [
+         quote(do: {unquote_splicing(args)}),
+         [
+           do:
+             List.flatten(
+               for d <- defs do
+                 quote do
+                   {unquote_splicing(d.args)}
+                   when unquote(d.pre) and unquote(d.guard) ->
+                     # TODO remove ghost body to avoid infinite unfold loops?
+                     res = unquote(remove_ghost_code(d.body))
+
+                     ghost do
+                       assume res === unquote(f)(unquote_splicing(args))
+                       assume unquote(d.post)
+                     end
+                 end
+               end
+             )
+         ]
+       ]}
+    )
+  end
+
+  def translate(_, e) do
     [
       {e,
        quote do

@@ -1,4 +1,5 @@
 defmodule Verixir do
+  alias Boogiex.Lang.L2Exp
   alias Boogiex.UserDefined.FunctionDef
 
   @spec __using__([]) :: Macro.t()
@@ -87,9 +88,8 @@ defmodule Verixir do
         verification_functions
       )
 
-      # TODO remove ghosts
       def unquote(name)(unquote_splicing(args)) when unquote(guard) do
-        unquote(body)
+        unquote(L2Exp.remove_ghost_code(body))
       end
     end
   end
@@ -105,11 +105,13 @@ defmodule Verixir do
           %{}
         end
 
+      verification_functions =
+        Map.new(verification_functions, fn {k, defs} ->
+          {k, Enum.reverse(defs)}
+        end)
+
       for {{name, arity}, defs} <- verification_functions do
         IO.puts("Verifying #{name}/#{arity}")
-
-        # TODO take into account that they are reversed
-        defs = Enum.reverse(defs)
 
         env =
           Boogiex.Env.new(
@@ -118,11 +120,10 @@ defmodule Verixir do
           )
 
         # TODO, hardcoded
-        fresh_vars = [Macro.var(:f1, __MODULE__)]
+        fresh_vars = [{:f1, [], nil}]
 
-        # TODO find a better way to build this AST
         errors =
-          Boogiex.Lang.L2Exp.verify(
+          L2Exp.verify(
             env,
             quote do
               (unquote_splicing(
@@ -133,30 +134,33 @@ defmodule Verixir do
                  end
                ))
 
-              unquote({
-                :case,
-                [],
-                [
-                  quote(do: {unquote_splicing(fresh_vars)}),
-                  [
-                    do:
-                      List.flatten([
-                        for d <- defs do
-                          quote do
-                            {unquote_splicing(d.args)} when unquote(d.pre) and unquote(d.guard) ->
-                              ghost do
-                                assume unquote(name)(unquote_splicing(d.args)) === unquote(d.body)
-                                assert(unquote(d.post))
-                              end
-                          end
-                        end,
-                        quote do
-                          {unquote_splicing(fresh_vars)} -> true
-                        end
-                      ])
-                  ]
-                ]
-              })
+              unquote({:case, [],
+               [
+                 quote(do: {unquote_splicing(fresh_vars)}),
+                 [
+                   do:
+                     List.flatten([
+                       for d <- defs do
+                         quote do
+                           {unquote_splicing(d.args)}
+                           when unquote(d.pre) and unquote(d.guard) ->
+                             # TODO experiment
+                             #  unfold unquote(name)(unquote_splicing(fresh_vars))
+
+                             res = unquote(d.body)
+
+                             ghost do
+                               assume res === unquote(name)(unquote_splicing(fresh_vars))
+                               assert unquote(d.post)
+                             end
+                         end
+                       end,
+                       quote do
+                         {unquote_splicing(fresh_vars)} -> true
+                       end
+                     ])
+                 ]
+               ]})
             end
           )
 

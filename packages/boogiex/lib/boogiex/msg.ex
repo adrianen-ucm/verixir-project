@@ -74,9 +74,9 @@ defmodule Boogiex.Msg do
     "Could not start the tuple constructor agent: #{inspect(e)}"
   end
 
-  @spec undefined_function_body(atom(), [Macro.t()]) :: String.t()
-  def undefined_function_body(fun_name, args) do
-    "Undefined body for user function #{Atom.to_string(fun_name)}/#{length(args)}"
+  @spec undefined_user_defined_function(atom(), [Macro.t()]) :: String.t()
+  def undefined_user_defined_function(fun_name, args) do
+    "No definition for #{Atom.to_string(fun_name)}/#{length(args)}"
   end
 
   @spec body_expansion_does_not_hold(atom(), [Macro.t()]) :: String.t()

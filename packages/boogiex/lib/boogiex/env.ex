@@ -95,6 +95,11 @@ defmodule Boogiex.Env do
     end
   end
 
+  @spec user_defined(t()) :: UserDefined.t()
+  def user_defined(env) do
+    env.user_defined
+  end
+
   @spec tuple_constructor(t(), non_neg_integer()) :: atom()
   def tuple_constructor(env, n) do
     {fresh, name} =

@@ -4,6 +4,7 @@ defmodule Example do
   @verifier requires is_integer(x)
   @verifier ensures dup(x) === 2 * x
   defv dup(x) when is_integer(x) do
+    # unfold dup(x)
     x + x
   end
 

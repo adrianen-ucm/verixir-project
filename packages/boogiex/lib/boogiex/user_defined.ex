@@ -28,8 +28,8 @@ defmodule Boogiex.UserDefined do
     Map.keys(user_defined.functions)
   end
 
-  @spec function_defs(t(), atom(), non_neg_integer()) :: [FunctionDef.t()]
+  @spec function_defs(t(), atom(), non_neg_integer()) :: [FunctionDef.t()] | nil
   def function_defs(user_defined, name, arity) do
-    Map.get(user_defined.functions, {name, arity}, [])
+    Map.get(user_defined.functions, {name, arity})
   end
 end

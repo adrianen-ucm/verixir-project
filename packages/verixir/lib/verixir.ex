@@ -1,4 +1,6 @@
 defmodule Verixir do
+  alias Boogiex.UserDefined.FunctionDef
+
   @spec __using__([]) :: Macro.t()
   defmacro __using__(_) do
     quote do
@@ -62,13 +64,12 @@ defmodule Verixir do
       {pre, verifier} = Keyword.pop(verifier, :requires, true)
       {post, verifier} = Keyword.pop(verifier, :ensures, true)
 
-      # TODO use a struct?
-      function = {
-        pre,
-        post,
-        unquote(Macro.escape(body)),
-        unquote(Macro.escape(args)),
-        unquote(Macro.escape(guard))
+      function_def = %FunctionDef{
+        body: unquote(Macro.escape(body)),
+        args: unquote(Macro.escape(args)),
+        guard: unquote(Macro.escape(guard)),
+        pre: pre,
+        post: post
       }
 
       # TODO take into account that they are reversed
@@ -76,8 +77,8 @@ defmodule Verixir do
         Map.update(
           verification_functions,
           {unquote(name), unquote(length(args))},
-          [function],
-          fn defs -> [function | defs] end
+          [function_def],
+          fn defs -> [function_def | defs] end
         )
 
       Module.put_attribute(
@@ -110,8 +111,11 @@ defmodule Verixir do
         # TODO take into account that they are reversed
         defs = Enum.reverse(defs)
 
-        # TODO introduce the user definitions
-        env = Boogiex.Env.new(SmtLib.Connection.Z3.new())
+        env =
+          Boogiex.Env.new(
+            SmtLib.Connection.Z3.new(),
+            functions: verification_functions
+          )
 
         # TODO, hardcoded
         fresh_vars = [Macro.var(:f1, __MODULE__)]
@@ -121,8 +125,6 @@ defmodule Verixir do
           Boogiex.Lang.L2Exp.verify(
             env,
             quote do
-              ghost(do: havoc(res))
-
               (unquote_splicing(
                  for v <- fresh_vars do
                    quote do
@@ -139,11 +141,13 @@ defmodule Verixir do
                   [
                     do:
                       List.flatten([
-                        for {pre, post, body, args, guard} <- defs do
+                        for d <- defs do
                           quote do
-                            {unquote_splicing(args)} when unquote(pre) and unquote(guard) ->
-                              res = unquote(body)
-                              ghost(do: assert(unquote(post)))
+                            {unquote_splicing(d.args)} when unquote(d.pre) and unquote(d.guard) ->
+                              ghost do
+                                assume unquote(name)(unquote_splicing(d.args)) === unquote(d.body)
+                                assert(unquote(d.post))
+                              end
                           end
                         end,
                         quote do
@@ -156,7 +160,7 @@ defmodule Verixir do
             end
           )
 
-        Enum.each(errors, &IO.puts/1)
+        Enum.each(errors, &IO.warn/1)
         Boogiex.Env.clear(env)
       end
     end

@@ -54,9 +54,6 @@ defmodule Boogiex do
             {:block, meta, [body]}, 0 ->
               {{:block, meta, [quote(do: env), body]}, 0}
 
-            {:unfold, meta, [ast]}, 0 ->
-              {{:unfold, meta, [quote(do: env), ast]}, 0}
-
             {:with_local_env, _, _} = ast, n ->
               {ast, n + 1}
 
@@ -95,7 +92,12 @@ defmodule Boogiex do
 
   @spec assume(env(), L1Exp.ast()) :: Macro.t()
   @spec assume(env(), L1Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assume(env, ast, error_msg \\ Msg.assume_failed()) do
+  defmacro assume(env, ast, error_msg \\ nil) do
+    error_msg =
+      with nil <- error_msg do
+        Msg.assume_failed(ast)
+      end
+
     quote do
       L1Stm.eval(
         unquote(env),
@@ -112,7 +114,12 @@ defmodule Boogiex do
 
   @spec assert(env(), L1Exp.ast()) :: Macro.t()
   @spec assert(env(), L1Exp.ast(), Macro.t()) :: Macro.t()
-  defmacro assert(env, ast, error_msg \\ Msg.assert_failed()) do
+  defmacro assert(env, ast, error_msg \\ nil) do
+    error_msg =
+      with nil <- error_msg do
+        Msg.assert_failed(ast)
+      end
+
     quote do
       L1Stm.eval(
         unquote(env),
@@ -120,22 +127,6 @@ defmodule Boogiex do
           Macro.escape(
             quote do
               assert unquote(ast), unquote(error_msg)
-            end
-          )
-        )
-      )
-    end
-  end
-
-  @spec unfold(env(), Macro.t()) :: Macro.t()
-  defmacro unfold(env, ast) do
-    quote do
-      L1Stm.eval(
-        unquote(env),
-        unquote(
-          Macro.escape(
-            quote do
-              unfold unquote(ast)
             end
           )
         )

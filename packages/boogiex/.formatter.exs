@@ -14,7 +14,6 @@ locals_without_parens = [
   block: 1,
   block: 2,
   unfold: 1,
-  unfold: 2,
   fail: 1,
   add: 1,
   local: 1,

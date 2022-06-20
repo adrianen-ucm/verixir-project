@@ -2,12 +2,12 @@ defmodule Example do
   use Verixir
 
   @verifier requires is_integer(x)
-  @verifier ensures res === 2 * x
+  @verifier ensures dup(x) === 2 * x
   defv dup(x) when is_integer(x) do
     x + x
   end
 
-  @verifier ensures not is_integer(res)
+  @verifier ensures not is_integer(dup(y))
   defv dup(y) do
     y
   end

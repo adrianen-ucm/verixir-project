@@ -1,26 +1,25 @@
 defmodule Boogiex.UserDefined do
-  alias Boogiex.UserDefined.Function
+  alias Boogiex.UserDefined.FunctionDef
+
+  @type functions :: %{{atom(), non_neg_integer()} => FunctionDef.t()}
 
   @type params :: [
-          functions: [Function.t()]
+          functions: functions()
         ]
 
-  @type t() :: %__MODULE__{
-          functions: %{{atom(), non_neg_integer()} => Function.t()}
-        }
+  @opaque t() :: %__MODULE__{
+            functions: functions()
+          }
   defstruct [:functions]
 
   @spec new() :: t()
   @spec new(params()) :: t()
   def new(params \\ []) do
     Keyword.validate!(params, [:functions])
-    {functions, []} = Keyword.pop(params, :functions, [])
+    {functions, []} = Keyword.pop(params, :functions, %{})
 
     %__MODULE__{
-      functions:
-        functions
-        |> Enum.map(&{{&1.name, &1.arity}, &1})
-        |> Map.new()
+      functions: functions
     }
   end
 
@@ -29,8 +28,8 @@ defmodule Boogiex.UserDefined do
     Map.keys(user_defined.functions)
   end
 
-  @spec function(t(), atom(), non_neg_integer()) :: Function.t() | nil
-  def function(user_defined, name, arity) do
-    Map.get(user_defined.functions, {name, arity})
+  @spec function_defs(t(), atom(), non_neg_integer()) :: [FunctionDef.t()]
+  def function_defs(user_defined, name, arity) do
+    Map.get(user_defined.functions, {name, arity}, [])
   end
 end

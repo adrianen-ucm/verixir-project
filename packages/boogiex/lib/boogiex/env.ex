@@ -7,8 +7,7 @@ defmodule Boogiex.Env do
   alias Boogiex.BuiltIn.LitType
   alias Boogiex.Error.EnvError
   alias Boogiex.Env.TupleConstructor
-  alias Boogiex.BuiltIn.Function, as: BuiltInFunction
-  alias Boogiex.UserDefined.Function, as: UserFunction
+  alias Boogiex.BuiltIn.Function
 
   @opaque t() :: %__MODULE__{
             user_defined: UserDefined.t(),
@@ -85,20 +84,15 @@ defmodule Boogiex.Env do
     BuiltIn.lit_type(l)
   end
 
-  @spec function(t(), atom(), non_neg_integer()) :: BuiltInFunction.t() | nil
+  @spec function(t(), atom(), non_neg_integer()) :: Function.t() | nil
   def function(env, name, arity) do
     with nil <- BuiltIn.function(name, arity) do
-      with nil <- UserDefined.function(env.user_defined, name, arity) do
-        nil
+      if {name, arity} in UserDefined.functions(env.user_defined) do
+        %Function{name: name}
       else
-        f -> %BuiltInFunction{name: f.name}
+        nil
       end
     end
-  end
-
-  @spec user_function(t(), atom(), non_neg_integer()) :: UserFunction.t() | nil
-  def user_function(env, name, arity) do
-    UserDefined.function(env.user_defined, name, arity)
   end
 
   @spec tuple_constructor(t(), non_neg_integer()) :: atom()

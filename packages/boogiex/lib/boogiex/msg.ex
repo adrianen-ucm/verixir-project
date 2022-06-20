@@ -44,11 +44,6 @@ defmodule Boogiex.Msg do
     "processing #{Atom.to_string(f)}/#{length(args)}"
   end
 
-  @spec unfold_context(Macro.t(), [Macro.t()], Macro.t()) :: String.t()
-  def unfold_context(f, args, body) do
-    "unfolding #{Atom.to_string(f)}/#{length(args)} into #{Macro.to_string(body)}"
-  end
-
   @spec list_context(Macro.t(), Macro.t()) :: String.t()
   def list_context(h, t) do
     "processing the list with head #{Macro.to_string(h)} and tail #{Macro.to_string(t)}"
@@ -119,14 +114,14 @@ defmodule Boogiex.Msg do
     "Unknown type for literal #{Macro.to_string(literal)}"
   end
 
-  @spec assert_failed() :: String.t()
-  def assert_failed() do
-    "Assert failed"
+  @spec assert_failed(Macro.t()) :: String.t()
+  def assert_failed(e) do
+    "Assert failed #{Macro.to_string(e)}"
   end
 
-  @spec assume_failed() :: String.t()
-  def assume_failed() do
-    "Assume failed"
+  @spec assume_failed(Macro.t()) :: String.t()
+  def assume_failed(e) do
+    "Assume failed #{Macro.to_string(e)}"
   end
 
   @spec pattern_does_not_match(Macro.t(), Macro.t()) :: String.t()

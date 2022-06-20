@@ -147,10 +147,10 @@ defmodule Boogiex.Lang.L2Code do
          end)}
 
       {:unfold, _, _} ->
-        nil
+        {:__block__, [], []}
 
       {:ghost, _, _} ->
-        nil
+        {:__block__, [], []}
 
       other ->
         other

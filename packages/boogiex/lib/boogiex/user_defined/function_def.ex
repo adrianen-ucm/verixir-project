@@ -5,14 +5,12 @@ defmodule Boogiex.UserDefined.FunctionDef do
   @type t() :: %__MODULE__{
           body: L2Exp.ast(),
           args: [L2Exp.ast()],
-          guard: L1Exp.ast(),
           pre: L1Exp.ast(),
           post: L1Exp.ast()
         }
   defstruct [
     :body,
     :args,
-    guard: true,
     pre: true,
     post: true
   ]

@@ -64,12 +64,12 @@ defmodule Verixir do
 
       {pre, verifier} = Keyword.pop(verifier, :requires, true)
       {post, verifier} = Keyword.pop(verifier, :ensures, true)
+      guard = unquote(Macro.escape(guard))
 
       function_def = %FunctionDef{
         body: unquote(Macro.escape(body)),
         args: unquote(Macro.escape(args)),
-        guard: unquote(Macro.escape(guard)),
-        pre: pre,
+        pre: quote(do: unquote(pre) and unquote(guard)),
         post: post
       }
 
@@ -142,7 +142,7 @@ defmodule Verixir do
                          for d <- defs do
                            quote do
                              {unquote_splicing(d.args)}
-                             when unquote(d.pre) and unquote(d.guard) ->
+                             when unquote(d.pre) ->
                                res = unquote(d.body)
 
                                ghost do

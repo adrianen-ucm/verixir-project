@@ -165,7 +165,7 @@ defmodule Boogiex.Lang.L2Exp do
                for d <- defs do
                  quote do
                    {unquote_splicing(d.args)}
-                   when unquote(d.pre) and unquote(d.guard) ->
+                   when unquote(d.pre) ->
                      res = unquote(L2Code.remove_ghost(d.body))
 
                      ghost do

@@ -211,7 +211,7 @@ defmodule Boogiex.Lang.L2Exp do
     true
   end
 
-  defp translate_match({:|, _, [p1, p2]}, e) do
+  defp translate_match([{:|, _, [p1, p2]}], e) do
     tr_1 = translate_match(p1, quote(do: hd(unquote(e))))
     tr_2 = translate_match(p2, quote(do: tl(unquote(e))))
 
@@ -227,7 +227,7 @@ defmodule Boogiex.Lang.L2Exp do
   end
 
   defp translate_match([p1 | p2], e) do
-    translate_match({:|, [], [p1, p2]}, e)
+    translate_match([{:|, [], [p1, p2]}], e)
   end
 
   defp translate_match(tup, e) when is_tuple(tup) and tuple_size(tup) < 3 do

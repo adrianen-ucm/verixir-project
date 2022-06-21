@@ -38,7 +38,10 @@ defmodule Boogiex.BuiltIn do
                  is_boolean: [x: Term] :: Bool <- :type.(:x) == :bool,
                  is_tuple: [x: Term] :: Bool <- :type.(:x) == :tuple,
                  is_nonempty_list: [x: Term] :: Bool <- :type.(:x) == :nonempty_list,
-                 is_list: [x: Term] :: Bool <- :x == nil || :type.(:x) == :nonempty_list
+                 is_list:
+                   [x: Term] :: Bool <-
+                     :x == nil ||
+                       (:x != nil && :type.(:x) == :nonempty_list)
 
       declare_fun term_add: [Term, Term] :: Term,
                   term_sub: [Term, Term] :: Term,
@@ -313,7 +316,9 @@ defmodule Boogiex.BuiltIn do
               do:
                 :boolean_val.(:term_eq.(unquote(x), unquote(y))) ==
                   ((unquote(x) == nil && unquote(y) == nil) ||
-                     (:hd.(unquote(x)) == :hd.(unquote(y)) &&
+                     (:is_nonempty_list.(unquote(x)) &&
+                        :is_nonempty_list.(unquote(y)) &&
+                        :hd.(unquote(x)) == :hd.(unquote(y)) &&
                         :tl.(unquote(x)) == :tl.(unquote(y))))
             )
           end
@@ -401,7 +406,9 @@ defmodule Boogiex.BuiltIn do
               do:
                 :boolean_val.(:term_neq.(unquote(x), unquote(y))) ==
                   !((unquote(x) == nil && unquote(y) == nil) ||
-                      (:hd.(unquote(x)) == :hd.(unquote(y)) &&
+                      (:is_nonempty_list.(unquote(x)) &&
+                         :is_nonempty_list.(unquote(y)) &&
+                         :hd.(unquote(x)) == :hd.(unquote(y)) &&
                          :tl.(unquote(x)) == :tl.(unquote(y))))
             )
           end

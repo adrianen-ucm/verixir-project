@@ -29,6 +29,16 @@ L2Code.verify(
     ghost do
       assert y === 2, "y is not 2"
     end
+
+    [h | t] = [1, 2]
+
+    ghost do
+      assert h === 1
+    end
+
+    ghost do
+      assert false, "This should fail"
+    end
   end
 )
 

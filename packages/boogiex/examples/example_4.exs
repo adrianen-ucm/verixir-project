@@ -8,6 +8,7 @@ with_local_env do
   assert [1 | [2 | [3 | []]]] === [1, 2, 3]
   assert [1, 2 | [3 | []]] === [1, 2, 3]
   assert tl([1 | 3]) === 3
+  assert [1] !== []
 
   assert false, "This should fail"
 end

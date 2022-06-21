@@ -37,11 +37,8 @@ defmodule Boogiex.BuiltIn do
       define_fun is_integer: [x: Term] :: Bool <- :type.(:x) == :int,
                  is_boolean: [x: Term] :: Bool <- :type.(:x) == :bool,
                  is_tuple: [x: Term] :: Bool <- :type.(:x) == :tuple,
-                 is_nonempty_list: [x: Term] :: Bool <- :type.(:x) == :nonempty_list,
-                 is_list:
-                   [x: Term] :: Bool <-
-                     :x == nil ||
-                       (:x != nil && :type.(:x) == :nonempty_list)
+                 is_nonempty_list: [x: Term] :: Bool <- :x != nil && :type.(:x) == :nonempty_list,
+                 is_list: [x: Term] :: Bool <- :x == nil || :type.(:x) == :nonempty_list
 
       declare_fun term_add: [Term, Term] :: Term,
                   term_sub: [Term, Term] :: Term,

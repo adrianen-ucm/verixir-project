@@ -245,7 +245,6 @@ defmodule Boogiex.Lang.L1Exp do
         context unquote(fn -> Msg.list_context(h, t) end) do
           unquote_splicing([head_sem] |> Enum.reject(&is_nil/1))
           unquote_splicing([tail_sem] |> Enum.reject(&is_nil/1))
-          add unquote(list) != nil
           add :is_nonempty_list.(unquote(list))
           add :hd.(unquote(list)) == unquote(head)
           add :tl.(unquote(list)) == unquote(tail)

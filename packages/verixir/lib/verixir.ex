@@ -124,13 +124,15 @@ defmodule Verixir do
           L2Code.verify(
             env,
             quote do
-              (unquote_splicing(
-                 for v <- fresh_vars do
-                   quote do
-                     ghost(do: havoc(unquote(v)))
+              ghost do
+                (unquote_splicing(
+                   for v <- fresh_vars do
+                     quote do
+                       havoc(unquote(v))
+                     end
                    end
-                 end
-               ))
+                 ))
+              end
 
               unquote(
                 {:case, [],

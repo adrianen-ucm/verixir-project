@@ -4,6 +4,8 @@ defmodule Boogiex.Lang.L2Code do
   alias Boogiex.Env
   alias Boogiex.Lang.L1Stm
   alias Boogiex.Lang.L2Exp
+  alias Boogiex.UserDefined
+  alias Boogiex.Error.EnvError
 
   @typep ssa_state :: any()
 
@@ -13,8 +15,12 @@ defmodule Boogiex.Lang.L2Code do
 
     for {_, sem} <-
           L2Exp.translate(
-            Env.user_defined(env),
-            ssa(e)
+            ssa(
+              expand_unfolds(
+                Env.user_defined(env),
+                e
+              )
+            )
           ) do
       L1Stm.eval(
         env,
@@ -151,6 +157,43 @@ defmodule Boogiex.Lang.L2Code do
 
       {:ghost, _, _} ->
         {:__block__, [], []}
+
+      other ->
+        other
+    end)
+  end
+
+  @spec expand_unfolds(UserDefined.t(), L2Exp.ast()) :: L2Exp.ast()
+  def expand_unfolds(user_defined, ast) do
+    Macro.prewalk(ast, fn
+      {:unfold, _, [{f, _, args}]} ->
+        defs =
+          with nil <- UserDefined.function_defs(user_defined, f, length(args)) do
+            raise EnvError,
+              message: Msg.undefined_user_defined_function(f, args)
+          end
+
+        {:case, [],
+         [
+           quote(do: {unquote_splicing(args)}),
+           [
+             do:
+               List.flatten(
+                 for d <- defs do
+                   quote do
+                     {unquote_splicing(d.args)}
+                     when unquote(d.pre) ->
+                       res = unquote(remove_ghost(d.body))
+
+                       ghost do
+                         assume res === unquote(f)(unquote_splicing(args))
+                         assume unquote(d.post)
+                       end
+                   end
+                 end
+               )
+           ]
+         ]}
 
       other ->
         other

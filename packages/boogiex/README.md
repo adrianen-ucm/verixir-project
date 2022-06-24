@@ -1,7 +1,6 @@
 # Boogiex
 
-An intermediate representation language for Elixir code 
-verification inspired by Boogie.
+An intermediate representation language for Elixir code verification inspired by Boogie.
 
 ```elixir
 import Boogiex
@@ -35,3 +34,5 @@ with_local_env do
   assert a === c
 end
 ```
+
+This is currently in early development stage and breaking changes can arise.

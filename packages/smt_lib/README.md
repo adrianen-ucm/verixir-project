@@ -5,7 +5,7 @@ and capabilities to also work with
 [other SMT-LIB interpreters](#other-smt-lib-interpreters).
 
 This is currently in early development stage, so a small subset of 
-SMT-LIB is supported and breaking changes can arise.
+SMT-LIB is supported, and breaking changes can arise.
 
 ## Usage 
 

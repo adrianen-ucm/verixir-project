@@ -32,6 +32,7 @@ defmodule SmtLib.API do
               :ok
 
             {:specific_success_response, {:check_sat_response, r}} ->
+              Logger.debug("#{r}", language: :smtlib)
               {:ok, r}
 
             {:error, r} ->
@@ -39,6 +40,7 @@ defmodule SmtLib.API do
               {:error, r}
 
             other ->
+              Logger.error("SMT-LIB #{other}", language: :smtlib)
               {:error, other}
           end
         end

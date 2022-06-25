@@ -77,7 +77,6 @@ defmodule Boogiex.Lang.L1Exp do
                        ) do
               add :is_boolean.(unquote(t))
               add :boolean_val.(unquote(t))
-              add :boolean_val.(unquote(t1))
             else
               unquote_splicing([sem2] |> Enum.reject(&is_nil/1))
 
@@ -85,7 +84,6 @@ defmodule Boogiex.Lang.L1Exp do
                            unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                            add :boolean_val.(unquote(t1))
                          ) do
-                add !:boolean_val.(unquote(t1))
                 add unquote(t) == unquote(t2)
               else
                 when_unsat (
@@ -142,7 +140,6 @@ defmodule Boogiex.Lang.L1Exp do
                        ) do
               add :is_boolean.(unquote(t))
               add !:boolean_val.(unquote(t))
-              add !:boolean_val.(unquote(t1))
             else
               unquote_splicing([sem2] |> Enum.reject(&is_nil/1))
 
@@ -150,7 +147,6 @@ defmodule Boogiex.Lang.L1Exp do
                            unquote_splicing([assumption] |> Enum.reject(&is_nil/1))
                            add !:boolean_val.(unquote(t1))
                          ) do
-                add :boolean_val.(unquote(t1))
                 add unquote(t) == unquote(t2)
               else
                 when_unsat (

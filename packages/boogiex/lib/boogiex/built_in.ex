@@ -614,28 +614,17 @@ defmodule Boogiex.BuiltIn do
   end
 
   @spec fresh(From.ast()) :: atom()
-  defp fresh(x) do
-    case Macro.prewalk(
-           x,
-           nil,
-           fn
-             v1, nil when is_atom(v1) ->
-               {v1, v1}
+  defp fresh(e) do
+    {_, vars} =
+      Macro.prewalk(e, MapSet.new(), fn
+        v, vs when is_atom(v) -> {v, MapSet.put(vs, Atom.to_string(v))}
+        other, vs -> {other, vs}
+      end)
 
-             v1, v2 when is_atom(v1) ->
-               if String.length(Atom.to_string(v1)) >
-                    String.length(Atom.to_string(v2)) do
-                 {v1, v1}
-               else
-                 {v1, v2}
-               end
-
-             other, v ->
-               {other, v}
-           end
-         ) do
-      {_, nil} -> :n
-      {_, v} -> String.to_atom("#{Atom.to_string(v)}_aux")
-    end
+    Stream.iterate(1, &(&1 + 1))
+    |> Stream.map(&"x_#{&1}")
+    |> Stream.reject(&(&1 in vars))
+    |> Enum.at(0)
+    |> String.to_atom()
   end
 end

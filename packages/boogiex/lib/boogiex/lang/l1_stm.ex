@@ -4,6 +4,8 @@ defmodule Boogiex.Lang.L1Stm do
   alias Boogiex.Env
   alias Boogiex.Lang.L0Exp
   alias Boogiex.Lang.L1Exp
+  alias Boogiex.UserDefined
+  alias Boogiex.BuiltIn.TupleConstructor
 
   @type ast :: Macro.t()
 
@@ -11,89 +13,132 @@ defmodule Boogiex.Lang.L1Stm do
   def eval(env, s) do
     Logger.debug(Macro.to_string(s), language: :l1)
 
+    {e, tuple_constructor} =
+      translate(
+        s,
+        Env.user_defined(env),
+        Env.tuple_constructor(env)
+      )
+
+    Env.update_tuple_constructor(env, tuple_constructor)
+
     L0Exp.eval(
-      env,
-      fn -> Msg.evaluate_stm_context(s) end,
-      translate(env, s)
+      Env.connection(env),
+      Msg.evaluate_stm_context(s),
+      e
     )
   end
 
-  @spec translate(Env.t(), ast()) :: L0Exp.ast()
-  def translate(_, {:havoc, _, [{var_name, _, _}]}) do
-    quote do
-      context unquote(fn -> Msg.havoc_context(var_name) end) do
-        declare_const unquote(var_name)
-      end
-    end
-  end
-
-  def translate(env, {:assume, m, [f]}) do
-    translate(env, {:assume, m, [f, Msg.assume_failed(f)]})
-  end
-
-  def translate(env, {:assume, _, [f, error]}) do
-    {f_t, f_sem} = L1Exp.translate(env, f)
-
-    quote do
-      context unquote(Msg.assume_context(f)) do
-        unquote_splicing([f_sem] |> Enum.reject(&is_nil/1))
-
-        when_unsat add !:is_boolean.(unquote(f_t)) do
-          add :boolean_val.(unquote(f_t))
-        else
-          fail unquote(error)
+  @spec translate(ast(), UserDefined.t(), TupleConstructor.t()) ::
+          {L0Exp.ast(), TupleConstructor.t()}
+  def translate({:havoc, _, [{var_name, _, _}]}, _, tuple_constructor) do
+    {
+      quote do
+        context unquote(Msg.havoc_context(var_name)) do
+          declare_const unquote(var_name)
         end
-      end
-    end
+      end,
+      tuple_constructor
+    }
   end
 
-  def translate(env, {:assert, m, [f]}) do
-    translate(env, {:assert, m, [f, Msg.assert_failed(f)]})
+  def translate({:assume, m, [f]}, user_defined, tuple_constructor) do
+    translate(
+      {:assume, m, [f, Msg.assume_failed(f)]},
+      user_defined,
+      tuple_constructor
+    )
   end
 
-  def translate(env, {:assert, _, [f, error]}) do
-    {f_t, f_sem} = L1Exp.translate(env, f)
+  def translate({:assume, _, [f, error]}, user_defined, tuple_constructor) do
+    {{f_t, f_sem}, tuple_constructor} =
+      L1Exp.translate(
+        f,
+        user_defined,
+        tuple_constructor
+      )
 
-    quote do
-      context unquote(Msg.assert_context(f)) do
-        unquote_splicing([f_sem] |> Enum.reject(&is_nil/1))
+    {
+      quote do
+        context unquote(Msg.assume_context(f)) do
+          unquote_splicing([f_sem] |> Enum.reject(&is_nil/1))
 
-        when_unsat add !:is_boolean.(unquote(f_t)) do
-        else
-          fail unquote(error)
+          when_unsat add !:is_boolean.(unquote(f_t)) do
+            add :boolean_val.(unquote(f_t))
+          else
+            fail unquote(error)
+          end
         end
-
-        when_unsat add !:boolean_val.(unquote(f_t)) do
-          add :boolean_val.(unquote(f_t))
-        else
-          fail unquote(error)
-        end
-      end
-    end
+      end,
+      tuple_constructor
+    }
   end
 
-  def translate(env, {:block, _, [[do: s]]}) do
-    quote do
-      context unquote(Msg.block_context()) do
-        local do
-          unquote(
-            translate(
-              env,
-              s
-            )
-          )
-        end
-      end
-    end
+  def translate({:assert, m, [f]}, user_defined, tuple_constructor) do
+    translate(
+      {:assert, m, [f, Msg.assert_failed(f)]},
+      user_defined,
+      tuple_constructor
+    )
   end
 
-  def translate(env, {:__block__, _, es}) do
-    quote do
-      (unquote_splicing(
-         es
-         |> Stream.map(&translate(env, &1))
-         |> Enum.reject(&is_nil/1)
-       ))
-    end
+  def translate({:assert, _, [f, error]}, user_defined, tuple_constructor) do
+    {{f_t, f_sem}, tuple_constructor} =
+      L1Exp.translate(
+        f,
+        user_defined,
+        tuple_constructor
+      )
+
+    {
+      quote do
+        context unquote(Msg.assert_context(f)) do
+          unquote_splicing([f_sem] |> Enum.reject(&is_nil/1))
+
+          when_unsat add !:is_boolean.(unquote(f_t)) do
+          else
+            fail unquote(error)
+          end
+
+          when_unsat add !:boolean_val.(unquote(f_t)) do
+            add :boolean_val.(unquote(f_t))
+          else
+            fail unquote(error)
+          end
+        end
+      end,
+      tuple_constructor
+    }
+  end
+
+  def translate({:block, _, [[do: s]]}, user_defined, tuple_constructor) do
+    {t, tuple_constructor} = translate(s, user_defined, tuple_constructor)
+
+    {
+      quote do
+        context unquote(Msg.block_context()) do
+          local do
+            unquote(t)
+          end
+        end
+      end,
+      tuple_constructor
+    }
+  end
+
+  def translate({:__block__, _, es}, user_defined, tuple_constructor) do
+    {es, tuple_constructor} =
+      Enum.map_reduce(
+        es,
+        tuple_constructor,
+        &translate(&1, user_defined, &2)
+      )
+
+    {
+      quote do
+        (unquote_splicing(es |> Enum.reject(&is_nil/1)))
+      end,
+      tuple_constructor
+    }
   end
 end

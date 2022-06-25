@@ -1,18 +1,16 @@
 defmodule Boogiex.Env do
+  alias Boogiex.Msg
   alias Boogiex.BuiltIn
   alias SmtLib.Connection
-  alias Boogiex.Msg
   alias Boogiex.Lang.SmtLib
   alias Boogiex.UserDefined
-  alias Boogiex.BuiltIn.LitType
   alias Boogiex.Error.EnvError
-  alias Boogiex.Env.TupleConstructor
-  alias Boogiex.BuiltIn.Function
+  alias Boogiex.BuiltIn.TupleConstructor
 
   @opaque t() :: %__MODULE__{
             user_defined: UserDefined.t(),
             connection: Connection.t(),
-            tuple_constructor: TupleConstructor.t()
+            tuple_constructor: pid()
           }
   defstruct [:user_defined, :connection, :tuple_constructor]
 
@@ -22,7 +20,7 @@ defmodule Boogiex.Env do
     user_defined = UserDefined.new(params)
 
     tuple_constructor =
-      with {:ok, tuple_constructor} <- TupleConstructor.start() do
+      with {:ok, tuple_constructor} <- Agent.start_link(fn -> TupleConstructor.new() end) do
         tuple_constructor
       else
         {:error, e} ->
@@ -30,21 +28,15 @@ defmodule Boogiex.Env do
             message: Msg.could_not_start_tuple_constructor(e)
       end
 
-    env = %__MODULE__{
-      user_defined: user_defined,
-      connection: connection,
-      tuple_constructor: tuple_constructor
-    }
-
     SmtLib.run(
-      env,
-      &Msg.initialize_smt_context/0,
+      connection,
+      Msg.initialize_smt_context(),
       BuiltIn.init()
     )
 
     SmtLib.run(
-      env,
-      &Msg.initialize_user_defined_context/0,
+      connection,
+      Msg.initialize_user_defined_context(),
       user_defined
       |> UserDefined.functions()
       |> Enum.map(fn {name, arity} ->
@@ -52,12 +44,16 @@ defmodule Boogiex.Env do
       end)
     )
 
-    env
+    %__MODULE__{
+      user_defined: user_defined,
+      connection: connection,
+      tuple_constructor: tuple_constructor
+    }
   end
 
   @spec clear(t()) :: :ok | {:error, term()}
   def clear(env) do
-    TupleConstructor.stop(env.tuple_constructor)
+    Agent.stop(env.tuple_constructor)
 
     env
     |> connection()
@@ -69,53 +65,40 @@ defmodule Boogiex.Env do
     env.connection
   end
 
-  @spec on_push(t()) :: :ok
-  def on_push(env) do
-    TupleConstructor.push(env.tuple_constructor)
-  end
-
-  @spec on_pop(t()) :: :ok
-  def on_pop(env) do
-    TupleConstructor.pop(env.tuple_constructor)
-  end
-
-  @spec lit_type(t(), term()) :: LitType.t() | nil
-  def lit_type(_, l) do
-    BuiltIn.lit_type(l)
-  end
-
-  @spec function(t(), atom(), non_neg_integer()) :: Function.t() | nil
-  def function(env, name, arity) do
-    with nil <- BuiltIn.function(name, arity) do
-      if {name, arity} in UserDefined.functions(env.user_defined) do
-        %Function{name: name}
-      else
-        nil
-      end
-    end
-  end
-
   @spec user_defined(t()) :: UserDefined.t()
   def user_defined(env) do
     env.user_defined
   end
 
-  @spec tuple_constructor(t(), non_neg_integer()) :: atom()
-  def tuple_constructor(env, n) do
-    {fresh, name} =
-      TupleConstructor.tuple_constructor(
+  @spec tuple_constructor(t()) :: TupleConstructor.t()
+  def tuple_constructor(env) do
+    Agent.get(env.tuple_constructor, & &1)
+  end
+
+  @spec update_tuple_constructor(t(), TupleConstructor.t()) :: :ok
+  def update_tuple_constructor(env, tuple_constructor) do
+    diff =
+      Agent.get_and_update(
         env.tuple_constructor,
-        n
+        fn old_tuple_constructor ->
+          {
+            MapSet.difference(
+              TupleConstructor.get_all(tuple_constructor),
+              TupleConstructor.get_all(old_tuple_constructor)
+            ),
+            tuple_constructor
+          }
+        end
       )
 
-    if fresh do
+    for {n, const} <- diff do
       SmtLib.run(
-        env,
-        fn -> Msg.tuple_constructor_context(name) end,
-        BuiltIn.declare_function(name, n)
+        connection(env),
+        Msg.tuple_constructor_context(const),
+        BuiltIn.declare_function(const, n)
       )
     end
 
-    name
+    :ok
   end
 end

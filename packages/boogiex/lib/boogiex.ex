@@ -139,23 +139,23 @@ defmodule Boogiex do
     quote do
       env = unquote(env)
 
+      tuple_constructor = Env.tuple_constructor(env)
+
       Boogiex.Lang.SmtLib.run(
-        env,
+        Env.connection(env),
         Msg.block_context(),
         quote(do: push)
       )
 
-      Env.on_push(env)
-
       unquote(body)
 
       Boogiex.Lang.SmtLib.run(
-        env,
+        Env.connection(env),
         Msg.block_context(),
         quote(do: pop)
       )
 
-      Env.on_pop(env)
+      Env.update_tuple_constructor(env, tuple_constructor)
     end
   end
 

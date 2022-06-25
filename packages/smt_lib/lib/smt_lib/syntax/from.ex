@@ -177,6 +177,10 @@ defmodule SmtLib.Syntax.From do
     end
   end
 
+  def term({:__block__, _, [t]}) do
+    term(t)
+  end
+
   def term({:forall, _, [e, vs = [_ | _]]}) do
     quote do
       {

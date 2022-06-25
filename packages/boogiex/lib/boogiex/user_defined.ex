@@ -1,7 +1,7 @@
 defmodule Boogiex.UserDefined do
-  alias Boogiex.UserDefined.FunctionDef
+  alias Boogiex.UserDefined.Function
 
-  @type functions :: %{{atom(), non_neg_integer()} => FunctionDef.t()}
+  @type functions :: %{{atom(), non_neg_integer()} => Function.t()}
 
   @type params :: [
           functions: functions()
@@ -28,7 +28,7 @@ defmodule Boogiex.UserDefined do
     Map.keys(user_defined.functions)
   end
 
-  @spec function_defs(t(), atom(), non_neg_integer()) :: [FunctionDef.t()] | nil
+  @spec function_defs(t(), atom(), non_neg_integer()) :: [Function.t()] | nil
   def function_defs(user_defined, name, arity) do
     Map.get(user_defined.functions, {name, arity})
   end

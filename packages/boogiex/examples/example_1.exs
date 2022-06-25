@@ -1,7 +1,7 @@
 import Boogiex
 
 functions = %{
-  {:dup, 1} => %Boogiex.UserDefined.FunctionDef{
+  {:dup, 1} => %Boogiex.UserDefined.Function{
     body: quote(do: x + x),
     args: [quote(do: x)]
   }

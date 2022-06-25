@@ -1,4 +1,4 @@
-defmodule Boogiex.UserDefined.FunctionDef do
+defmodule Boogiex.UserDefined.Function do
   alias Boogiex.Lang.L1Exp
   alias Boogiex.Lang.L2Exp
 

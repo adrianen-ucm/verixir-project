@@ -281,13 +281,15 @@ defmodule Boogiex.BuiltIn do
             )
           end,
           post: fn [x, y] ->
+            v = fresh([x, y])
+
             quote(
               do:
                 :boolean_val.(:term_eq.(unquote(x), unquote(y))) ==
                   forall(
-                    (:n >= 0 && :n < :tuple_size.(unquote(x)))
-                    ~> (:elem.(unquote(x), :n) == :elem.(unquote(y), :n)),
-                    n: Int
+                    (unquote(v) >= 0 && unquote(v) < :tuple_size.(unquote(x)))
+                    ~> (:elem.(unquote(x), unquote(v)) == :elem.(unquote(y), unquote(v))),
+                    [{unquote(v), Int}]
                   )
             )
           end
@@ -371,13 +373,15 @@ defmodule Boogiex.BuiltIn do
             )
           end,
           post: fn [x, y] ->
+            v = fresh([x, y])
+
             quote(
               do:
                 :boolean_val.(:term_neq.(unquote(x), unquote(y))) ==
                   !forall(
-                    (:n >= 0 && :n < :tuple_size.(unquote(x)))
-                    ~> (:elem.(unquote(x), :n) == :elem.(unquote(y), :n)),
-                    n: Int
+                    (unquote(v) >= 0 && unquote(v) < :tuple_size.(unquote(x)))
+                    ~> (:elem.(unquote(x), unquote(v)) == :elem.(unquote(y), unquote(v))),
+                    [{unquote(v), Int}]
                   )
             )
           end
@@ -607,5 +611,31 @@ defmodule Boogiex.BuiltIn do
 
   def function(_, _) do
     nil
+  end
+
+  @spec fresh(From.ast()) :: atom()
+  defp fresh(x) do
+    case Macro.prewalk(
+           x,
+           nil,
+           fn
+             v1, nil when is_atom(v1) ->
+               {v1, v1}
+
+             v1, v2 when is_atom(v1) ->
+               if String.length(Atom.to_string(v1)) >
+                    String.length(Atom.to_string(v2)) do
+                 {v1, v1}
+               else
+                 {v1, v2}
+               end
+
+             other, v ->
+               {other, v}
+           end
+         ) do
+      {_, nil} -> :n
+      {_, v} -> String.to_atom("#{Atom.to_string(v)}_aux")
+    end
   end
 end

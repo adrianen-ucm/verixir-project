@@ -1,6 +1,6 @@
 defmodule Verixir do
   alias Boogiex.Lang.L2Code
-  alias Boogiex.UserDefined.FunctionDef
+  alias Boogiex.UserDefined.Function
 
   @spec __using__([]) :: Macro.t()
   defmacro __using__(_) do
@@ -66,7 +66,7 @@ defmodule Verixir do
       {post, verifier} = Keyword.pop(verifier, :ensures, true)
       guard = unquote(Macro.escape(guard))
 
-      function_def = %FunctionDef{
+      function_def = %Function{
         body: unquote(Macro.escape(body)),
         args: unquote(Macro.escape(args)),
         pre: quote(do: unquote(pre) and unquote(guard)),
@@ -93,6 +93,7 @@ defmodule Verixir do
     end
   end
 
+  @spec __before_compile__(Macro.Env.t()) :: Macro.t()
   defmacro __before_compile__(_) do
     quote do
       verification_functions =

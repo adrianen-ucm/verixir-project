@@ -20,7 +20,7 @@ defmodule Boogiex.Env do
     user_defined = UserDefined.new(params)
 
     tuple_constructor =
-      with {:ok, tuple_constructor} <- Agent.start_link(fn -> TupleConstructor.new() end) do
+      with {:ok, tuple_constructor} <- Agent.start_link(&TupleConstructor.new/0) do
         tuple_constructor
       else
         {:error, e} ->

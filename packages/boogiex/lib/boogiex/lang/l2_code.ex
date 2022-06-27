@@ -4,10 +4,9 @@ defmodule Boogiex.Lang.L2Code do
   alias Boogiex.Env
   alias Boogiex.Lang.L1Stm
   alias Boogiex.Lang.L2Exp
+  alias Boogiex.Lang.L2Var
   alias Boogiex.UserDefined
   alias Boogiex.Error.EnvError
-
-  @typep ssa_state :: any()
 
   @spec verify(Env.t(), L2Exp.ast()) :: [term()]
   def verify(env, e) do
@@ -15,10 +14,13 @@ defmodule Boogiex.Lang.L2Code do
 
     for {_, sem} <-
           L2Exp.translate(
-            ssa(
-              expand_unfolds(
-                Env.user_defined(env),
-                e
+            L2Var.ssa(
+              expand_specs(
+                expand_unfolds(
+                  e,
+                  Env.user_defined(env)
+                ),
+                Env.user_defined(env)
               )
             )
           ) do
@@ -34,221 +36,151 @@ defmodule Boogiex.Lang.L2Code do
     |> List.flatten()
   end
 
-  @spec ssa(L2Exp.ast()) :: L2Exp.ast()
-  def ssa(e) do
-    ssa_rec(e, {%{}, %{}}) |> elem(0)
-  end
-
-  @spec ssa_rec(L2Exp.ast(), ssa_state()) :: {L2Exp.ast(), ssa_state()}
-  defp ssa_rec({var_name, _, m} = ast, {_, version_stack} = state)
-       when is_atom(var_name) and is_atom(m) do
-    case version_stack[var_name] do
-      [h | _] ->
-        {{h, [], nil}, state}
-
-      _ ->
-        Logger.warn(Msg.free_var_in_ssa(var_name))
-        {ast, state}
-    end
-  end
-
-  defp ssa_rec({:ghost, _, [[do: s]]}, state) do
-    {s, state} = ssa_rec(s, state)
-
-    {
-      {:ghost, [], [[do: s]]},
-      state
-    }
-  end
-
-  defp ssa_rec({:__block__, _, es}, state) do
-    {es, state} = Enum.map_reduce(es, state, &ssa_rec/2)
-
-    {
-      {:__block__, [], es},
-      state
-    }
-  end
-
-  defp ssa_rec({:=, _, [p, e]}, state) do
-    {e, state} = ssa_rec(e, state)
-    state = new_version_for_vars(var_names(p), state)
-    {p, state} = ssa_rec(p, state)
-
-    {
-      {:=, [], [p, e]},
-      state
-    }
-  end
-
-  defp ssa_rec({:->, _, [[b], e]}, state) do
-    {p, f} =
-      case b do
-        {:when, [], [p, f]} -> {p, f}
-        p -> {p, true}
-      end
-
-    var_names = var_names(p)
-    state = new_version_for_vars(var_names, state)
-    {p, state} = ssa_rec(p, state)
-    {f, state} = ssa_rec(f, state)
-    {e, state} = ssa_rec(e, state)
-
-    {max_version, version_stack} = state
-
-    version_stack =
-      Map.new(
-        version_stack,
-        fn
-          {var, stack} ->
-            if var in var_names do
-              {var, tl(stack)}
-            else
-              {var, stack}
-            end
-        end
-      )
-
-    {
-      {:->, [], [[{:when, [], [p, f]}], e]},
-      {max_version, version_stack}
-    }
-  end
-
-  defp ssa_rec({:case, _, [e, [do: bs]]}, state) do
-    {e, state} = ssa_rec(e, state)
-    {bs, state} = Enum.map_reduce(bs, state, &ssa_rec/2)
-
-    {
-      {:case, [], [e, [do: bs]]},
-      state
-    }
-  end
-
-  defp ssa_rec(e, state) do
-    e =
-      Macro.prewalk(
-        e,
-        fn
-          {var_name, _, m} = var when is_atom(var_name) and is_atom(m) ->
-            ssa_rec(var, state) |> elem(0)
-
-          other ->
-            other
-        end
-      )
-
-    {e, state}
-  end
-
   @spec remove_ghost(L2Exp.ast()) :: L2Exp.ast()
   def remove_ghost(ast) do
     Macro.prewalk(ast, fn
       {:__block__, meta, es} ->
         {:__block__, meta,
          Enum.reject(es, fn
-           {:unfold, _, _} -> true
            {:ghost, _, _} -> true
+           {:unfold, _, _} -> true
            _ -> false
          end)}
-
-      {:unfold, _, _} ->
-        {:__block__, [], []}
 
       {:ghost, _, _} ->
         {:__block__, [], []}
 
-      other ->
-        other
-    end)
-  end
-
-  @spec expand_unfolds(UserDefined.t(), L2Exp.ast()) :: L2Exp.ast()
-  def expand_unfolds(user_defined, ast) do
-    Macro.prewalk(ast, fn
-      {:unfold, _, [{f, _, args}]} ->
-        defs =
-          with nil <- UserDefined.function_defs(user_defined, f, length(args)) do
-            raise EnvError,
-              message: Msg.undefined_user_defined_function(f, args)
-          end
-
-        {:case, [],
-         [
-           quote(do: {unquote_splicing(args)}),
-           [
-             do:
-               List.flatten(
-                 for d <- defs do
-                   quote do
-                     {unquote_splicing(d.args)}
-                     when unquote(d.pre) ->
-                       res = unquote(remove_ghost(d.body))
-
-                       ghost do
-                         assume res === unquote(f)(unquote_splicing(args))
-                         assume unquote(d.post)
-                       end
-                   end
-                 end
-               )
-           ]
-         ]}
+      {:unfold, _, _} ->
+        {:__block__, [], []}
 
       other ->
         other
     end)
   end
 
-  @spec var_names(L2Exp.ast()) :: MapSet.t(atom())
-  def var_names(p) do
-    MapSet.new(vars(p), &elem(&1, 0))
-  end
-
-  @spec vars(L2Exp.ast()) :: MapSet.t(L2Exp.ast())
-  def vars(p) do
+  @spec expand_unfolds(L2Exp.ast(), UserDefined.t()) :: L2Exp.ast()
+  def expand_unfolds(ast, user_defined) do
     Macro.prewalk(
-      p,
-      MapSet.new(),
+      ast,
       fn
-        {var_name, _, m} = c, vs when is_atom(var_name) and is_atom(m) ->
-          {c, MapSet.put(vs, {var_name, [], nil})}
+        {:unfold, _, [{f, _, args}]} ->
+          defs =
+            with nil <- UserDefined.function_defs(user_defined, f, length(args)) do
+              raise EnvError,
+                message: Msg.undefined_user_defined_function(f, args)
+            end
 
-        other_ast, other_acc ->
-          {other_ast, other_acc}
+          {:case, [],
+           [
+             quote(do: {unquote_splicing(args)}),
+             [
+               do:
+                 List.flatten(
+                   for d <- defs do
+                     quote do
+                       {unquote_splicing(d.args)}
+                       when unquote(d.pre) ->
+                         res = unquote(d.body)
+
+                         ghost do
+                           assume res === unquote(f)(unquote_splicing(args))
+                           assume unquote(d.post)
+                         end
+                     end
+                   end
+                 )
+             ]
+           ]}
+
+        other ->
+          other
       end
     )
-    |> elem(1)
   end
 
-  @spec new_version_for_vars(Enumerable.t(), ssa_state()) :: ssa_state()
-  defp new_version_for_vars(var_names, state) do
-    Enum.reduce(
-      var_names,
-      state,
-      fn var, {max_version, version_stack} ->
-        {version, max_version} =
-          Map.get_and_update(
-            max_version,
-            var,
-            fn
-              nil -> {1, 1}
-              n -> {n + 1, n + 1}
-            end
-          )
+  @spec expand_specs(L2Exp.ast(), UserDefined.t()) :: L2Exp.ast()
+  def expand_specs({:ghost, _, _} = ast, _) do
+    ast
+  end
 
-        name = String.to_atom("#{var}_#{version}")
+  def expand_specs({:=, _, [p, e]}, user_defined) do
+    {:=, [], [p, expand_specs(e, user_defined)]}
+  end
 
-        version_stack =
-          Map.update(
-            version_stack,
-            var,
-            [name],
-            fn ns -> [name | ns] end
-          )
+  def expand_specs({:__block__, _, es}, user_defined) do
+    {:__block__, [], Enum.map(es, &expand_specs(&1, user_defined))}
+  end
 
-        {max_version, version_stack}
+  def expand_specs({:case, _, [e, [do: bs]]}, user_defined) do
+    {:case, [],
+     [
+       expand_specs(e, user_defined),
+       [
+         do:
+           Enum.map(bs, fn {:->, _, [[b], e]} ->
+             {:->, [], [[b], expand_specs(e, user_defined)]}
+           end)
+       ]
+     ]}
+  end
+
+  def expand_specs({:if, _, [e, kw]}, user_defined) do
+    empty =
+      quote do
       end
-    )
+
+    {:if, [],
+     [
+       expand_specs(e, user_defined),
+       [
+         do: expand_specs(Keyword.get(kw, :do, empty), user_defined),
+         else: expand_specs(Keyword.get(kw, :else, empty), user_defined)
+       ]
+     ]}
+  end
+
+  def expand_specs(e, user_defined) do
+    {_, calls} =
+      Macro.prewalk(
+        e,
+        [],
+        fn
+          {f, _, args} = ast, calls when is_list(args) ->
+            case UserDefined.function_defs(user_defined, f, length(args)) do
+              nil -> {ast, calls}
+              defs -> {ast, [{defs, args} | calls]}
+            end
+
+          other, calls ->
+            {other, calls}
+        end
+      )
+
+    quote do
+      unquote_splicing(
+        for {defs, args} <- calls do
+          {:case, [],
+           [
+             quote(do: {unquote_splicing(args)}),
+             [
+               do:
+                 List.flatten(
+                   for d <- defs do
+                     quote do
+                       {unquote_splicing(d.args)}
+                       when unquote(d.pre) ->
+                         ghost do
+                           assume unquote(d.post)
+                         end
+                     end
+                   end
+                 )
+             ]
+           ]}
+        end
+      )
+
+      unquote(e)
+    end
   end
 end

@@ -23,9 +23,11 @@ defmodule Boogiex.UserDefined do
     }
   end
 
-  @spec functions(t()) :: [{atom(), non_neg_integer()}]
+  @spec functions(t()) :: MapSet.t({atom(), non_neg_integer()})
   def functions(user_defined) do
-    Map.keys(user_defined.functions)
+    user_defined.functions
+    |> Map.keys()
+    |> MapSet.new()
   end
 
   @spec function_defs(t(), atom(), non_neg_integer()) :: [Function.t()] | nil

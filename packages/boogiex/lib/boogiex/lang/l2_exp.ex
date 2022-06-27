@@ -3,7 +3,8 @@ defmodule Boogiex.Lang.L2Exp do
   alias Boogiex.Msg
   alias Boogiex.Lang.L1Exp
   alias Boogiex.Lang.L1Stm
-  alias Boogiex.Lang.L2Code
+  alias Boogiex.Lang.L2Var
+  alias Boogiex.Lang.L2Match
 
   @type ast :: Macro.t()
   @type enum(value) :: [value] | Enumerable.t()
@@ -20,11 +21,11 @@ defmodule Boogiex.Lang.L2Exp do
         quote do
           unquote_splicing([sem] |> Enum.reject(&is_nil/1))
 
-          assert unquote(translate_match(p, e)),
+          assert unquote(L2Match.translate(p, e)),
                  unquote(Msg.pattern_does_not_match(e, p))
 
           unquote_splicing(
-            for var <- L2Code.vars(p) do
+            for var <- L2Var.vars(p) do
               quote do
                 havoc unquote(var)
               end
@@ -63,19 +64,6 @@ defmodule Boogiex.Lang.L2Exp do
           }
         end)
 
-      {{:unfold, _, [{_, _, _}]} = ast, es} ->
-        Stream.flat_map(translate(ast), fn {_, u_sem} ->
-          Stream.map(translate({:__block__, [], es}), fn {es_t, es_sem} ->
-            {
-              es_t,
-              quote do
-                unquote_splicing([es_sem] |> Enum.reject(&is_nil/1))
-                unquote_splicing([u_sem] |> Enum.reject(&is_nil/1))
-              end
-            }
-          end)
-        end)
-
       _ ->
         Stream.flat_map(translate(h), fn {_, h_sem} ->
           Stream.map(translate({:__block__, [], t}), fn {t_t, t_sem} ->
@@ -91,6 +79,21 @@ defmodule Boogiex.Lang.L2Exp do
     end
   end
 
+  def translate({:if, _, [e, kw]}) do
+    empty =
+      quote do
+      end
+
+    translate(
+      quote do
+        case unquote(e) do
+          true -> unquote(Keyword.get(kw, :do, empty))
+          false -> unquote(Keyword.get(kw, :else, empty))
+        end
+      end
+    )
+  end
+
   def translate({:case, _, [e, [do: bs]]}) do
     Stream.flat_map(translate(e), fn {e_t, e_sem} ->
       {all_pattern_vars, one_pattern_holds} =
@@ -102,11 +105,11 @@ defmodule Boogiex.Lang.L2Exp do
             end
 
           {
-            MapSet.union(vs, L2Code.vars(pi)),
+            MapSet.union(vs, L2Var.vars(pi)),
             quote(
               do:
                 unquote(acc) or
-                  (unquote(translate_match(pi, e_t)) and
+                  (unquote(L2Match.translate(pi, e_t)) and
                      (not (unquote(e_t) === unquote(pi)) or unquote(fi)))
             )
           }
@@ -119,7 +122,7 @@ defmodule Boogiex.Lang.L2Exp do
             pi -> {pi, true}
           end
 
-        pattern_t = translate_match(pi, e_t)
+        pattern_t = L2Match.translate(pi, e_t)
 
         {
           Stream.map(translate(ei), fn {ei_t, ei_sem} ->
@@ -169,58 +172,5 @@ defmodule Boogiex.Lang.L2Exp do
          assert is_tuple({unquote(e)})
        end}
     ]
-  end
-
-  @spec translate_match(ast(), ast()) :: L1Exp.ast()
-  defp translate_match({var_name, _, m}, _) when is_atom(var_name) and is_atom(m) do
-    true
-  end
-
-  defp translate_match([{:|, _, [p1, p2]}], e) do
-    tr_1 = translate_match(p1, quote(do: hd(unquote(e))))
-    tr_2 = translate_match(p2, quote(do: tl(unquote(e))))
-
-    quote(
-      do:
-        is_list(unquote(e)) and unquote(e) !== [] and
-          unquote(tr_1) and unquote(tr_2)
-    )
-  end
-
-  defp translate_match([], e) do
-    quote(do: unquote(e) === [])
-  end
-
-  defp translate_match([p1 | p2], e) do
-    translate_match([{:|, [], [p1, p2]}], e)
-  end
-
-  defp translate_match(tup, e) when is_tuple(tup) and tuple_size(tup) < 3 do
-    translate_match({:{}, [], Tuple.to_list(tup)}, e)
-  end
-
-  defp translate_match({:{}, _, args}, e) do
-    for {t, i} <- Enum.with_index(args) do
-      translate_match(
-        t,
-        quote(do: elem(unquote_splicing([e, i])))
-      )
-    end
-    |> Enum.reduce(
-      quote(
-        do:
-          is_tuple(unquote(e)) and
-            tuple_size(unquote(e)) === unquote(length(args))
-      ),
-      fn tr, acc ->
-        quote do
-          unquote(acc) and unquote(tr)
-        end
-      end
-    )
-  end
-
-  defp translate_match(p, e) do
-    quote(do: unquote(e) === unquote(p))
   end
 end

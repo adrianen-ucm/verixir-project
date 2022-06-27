@@ -27,6 +27,10 @@ defmodule Boogiex.Lang.L1Exp do
     )
   end
 
+  def translate({:__block__, _, [e]}, assumption, user_defined, tuple_constructor) do
+    translate(e, assumption, user_defined, tuple_constructor)
+  end
+
   def translate({:{}, _, args}, assumption, user_defined, tuple_constructor) do
     {arg_results, tuple_constructor} =
       Enum.map_reduce(

@@ -19,7 +19,7 @@ defmodule Example do
                        n >= i and
                        acc1 === fib(i) and
                        acc2 === fib(i + 1)
-  @verifier ensures fib2(n, i, acc1, acc2) === fib(n)
+  @verifier ensures is_integer(fib2(n, i, acc1, acc2)) and fib2(n, i, acc1, acc2) === fib(n)
   defv fib2(n, i, acc1, acc2) do
     if n === i do
       acc1
@@ -37,7 +37,7 @@ defmodule Example do
   end
 
   @verifier requires is_integer(n)
-  @verifier ensures fib3(n) === fib(n)
+  @verifier ensures is_integer(fib3(n)) and fib3(n) === fib(n)
   defv fib3(n) when n >= 0 do
     unfold fib(0)
     unfold fib(1)

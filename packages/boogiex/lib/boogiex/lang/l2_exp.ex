@@ -7,44 +7,51 @@ defmodule Boogiex.Lang.L2Exp do
   alias Boogiex.Lang.L2Match
 
   @type ast :: Macro.t()
-  @type enum(value) :: [value] | Enumerable.t()
+  @type path_tree() ::
+          {:leaf, L1Stm.ast(), L1Exp.ast()}
+          | {:node, L1Stm.ast(), path_tree(), Enumerable.t()}
 
-  @spec translate(ast()) :: enum({L1Exp.ast(), L1Stm.ast()})
+  @spec translate(ast()) :: path_tree()
   def translate({:ghost, _, [[do: s]]}) do
-    [{[], s}]
+    {:leaf, s, []}
   end
 
   def translate({:=, _, [p, e]}) do
-    Stream.map(translate(e), fn {t, sem} ->
-      {
-        t,
-        quote do
-          unquote_splicing([sem] |> Enum.reject(&is_nil/1))
+    extend(
+      translate(e),
+      fn sem, t ->
+        {
+          :leaf,
+          quote do
+            unquote_splicing([sem] |> Enum.reject(&is_nil/1))
 
-          assert unquote(L2Match.translate(p, e)),
-                 unquote(Msg.pattern_does_not_match(e, p))
+            assert unquote(L2Match.translate(p, t)),
+                   unquote(Msg.pattern_does_not_match(t, p))
 
-          unquote_splicing(
-            for var <- L2Var.vars(p) do
-              quote do
-                havoc unquote(var)
+            unquote_splicing(
+              for var <- L2Var.vars(p) do
+                quote do
+                  havoc unquote(var)
+                end
               end
-            end
-          )
+            )
 
-          assume unquote(t) === unquote(p),
-                 unquote(Msg.pattern_does_not_match(e, p))
-        end
-      }
-    end)
+            assume unquote(t) === unquote(p),
+                   unquote(Msg.pattern_does_not_match(t, p))
+          end,
+          t
+        }
+      end
+    )
   end
 
   def translate({:__block__, _, []}) do
-    [
-      {[],
-       quote do
-       end}
-    ]
+    {
+      :leaf,
+      quote do
+      end,
+      []
+    }
   end
 
   def translate({:__block__, _, [e]}) do
@@ -54,28 +61,31 @@ defmodule Boogiex.Lang.L2Exp do
   def translate({:__block__, _, [h | t] = es}) do
     case List.pop_at(es, -1) do
       {{:ghost, _, [[do: s]]}, es} ->
-        Stream.map(translate({:__block__, [], es}), fn {es_t, es_sem} ->
-          {
-            es_t,
-            quote do
-              unquote_splicing([es_sem] |> Enum.reject(&is_nil/1))
-              unquote_splicing([s] |> Enum.reject(&is_nil/1))
-            end
-          }
-        end)
+        extend(
+          translate({:__block__, [], es}),
+          fn sem, t ->
+            {
+              :leaf,
+              quote do
+                (unquote_splicing([sem, s] |> Enum.reject(&is_nil/1)))
+              end,
+              t
+            }
+          end
+        )
 
       _ ->
-        Stream.flat_map(translate(h), fn {_, h_sem} ->
-          Stream.map(translate({:__block__, [], t}), fn {t_t, t_sem} ->
+        extend(
+          translate(h),
+          fn h_sem, _ ->
             {
-              t_t,
-              quote do
-                unquote_splicing([h_sem] |> Enum.reject(&is_nil/1))
-                unquote_splicing([t_sem] |> Enum.reject(&is_nil/1))
-              end
+              :node,
+              h_sem,
+              translate({:__block__, [], t}),
+              []
             }
-          end)
-        end)
+          end
+        )
     end
   end
 
@@ -95,82 +105,107 @@ defmodule Boogiex.Lang.L2Exp do
   end
 
   def translate({:case, _, [e, [do: bs]]}) do
-    Stream.flat_map(translate(e), fn {e_t, e_sem} ->
-      {all_pattern_vars, one_pattern_holds} =
-        Enum.reduce(bs, {MapSet.new(), false}, fn {:->, _, [[b], _]}, {vs, acc} ->
-          {pi, fi} =
-            case b do
-              {:when, [], [pi, fi]} -> {pi, fi}
-              pi -> {pi, true}
-            end
+    extend(
+      translate(e),
+      fn e_sem, e_t ->
+        {all_pattern_vars, one_pattern_holds} =
+          Enum.reduce(bs, {MapSet.new(), false}, fn {:->, _, [[b], _]}, {vs, acc} ->
+            {pi, fi} =
+              case b do
+                {:when, [], [pi, fi]} -> {pi, fi}
+                pi -> {pi, true}
+              end
 
-          {
-            MapSet.union(vs, L2Var.vars(pi)),
-            quote(
-              do:
-                unquote(acc) or
-                  (unquote(L2Match.translate(pi, e_t)) and
-                     (not (unquote(e_t) === unquote(pi)) or unquote(fi)))
-            )
-          }
-        end)
+            {
+              MapSet.union(vs, L2Var.vars(pi)),
+              quote(
+                do:
+                  unquote(acc) or
+                    (unquote(L2Match.translate(pi, e_t)) and
+                       (not (unquote(e_t) === unquote(pi)) or unquote(fi)))
+              )
+            }
+          end)
 
-      Stream.transform(bs, true, fn {:->, _, [[b], ei]}, previous_do_not_hold ->
-        {pi, fi} =
-          case b do
-            {:when, [], [pi, fi]} -> {pi, fi}
-            pi -> {pi, true}
-          end
+        stms =
+          Stream.transform(bs, true, fn {:->, _, [[b], ei]}, previous_do_not_hold ->
+            {pi, fi} =
+              case b do
+                {:when, [], [pi, fi]} -> {pi, fi}
+                pi -> {pi, true}
+              end
 
-        pattern_t = L2Match.translate(pi, e_t)
+            pattern_t = L2Match.translate(pi, e_t)
+
+            {
+              [
+                {
+                  :node,
+                  quote do
+                    assume unquote(previous_do_not_hold),
+                           unquote(Msg.bad_previous_branch_to(pi, fi))
+
+                    assume unquote(pattern_t),
+                           unquote(Msg.pattern_does_not_match(e_t, pi))
+
+                    assume unquote(e_t) === unquote(pi),
+                           unquote(Msg.pattern_does_not_match(e_t, pi))
+
+                    assume unquote(fi),
+                           unquote(Msg.guard_does_not_hold(fi))
+                  end,
+                  translate(ei),
+                  []
+                }
+              ],
+              quote(
+                do:
+                  unquote(previous_do_not_hold) and
+                    not (unquote(pattern_t) and
+                           (not (unquote(e_t) === unquote(pi)) or unquote(fi)))
+              )
+            }
+          end)
 
         {
-          Stream.map(translate(ei), fn {ei_t, ei_sem} ->
-            {
-              ei_t,
-              quote do
-                unquote_splicing([e_sem] |> Enum.reject(&is_nil/1))
+          :node,
+          quote do
+            unquote_splicing([e_sem] |> Enum.reject(&is_nil/1))
 
-                unquote_splicing(
-                  for var <- all_pattern_vars do
-                    quote do
-                      havoc unquote(var)
-                    end
-                  end
-                )
-
-                assert unquote(one_pattern_holds),
-                       unquote(Msg.no_case_pattern_holds_for(e))
-
-                assume unquote(previous_do_not_hold),
-                       unquote(Msg.bad_previous_branch_to(pi, fi))
-
-                assume unquote(pattern_t) and (not (unquote(e_t) === unquote(pi)) or unquote(fi)),
-                       unquote(Msg.pattern_does_not_match(e_t, pi))
-
-                assume unquote(e_t) === unquote(pi),
-                       unquote(Msg.pattern_does_not_match(e_t, pi))
-
-                unquote_splicing([ei_sem] |> Enum.reject(&is_nil/1))
+            unquote_splicing(
+              for var <- all_pattern_vars do
+                quote do
+                  havoc unquote(var)
+                end
               end
-            }
-          end),
-          quote(
-            do:
-              unquote(previous_do_not_hold) and
-                not (unquote(pattern_t) and (not (unquote(e_t) === unquote(pi)) or unquote(fi)))
-          )
+            )
+
+            assert unquote(one_pattern_holds),
+                   unquote(Msg.no_case_pattern_holds_for(e))
+          end,
+          Enum.at(stms, 0),
+          Stream.drop(stms, 1)
         }
-      end)
-    end)
+      end
+    )
   end
 
   def translate(e) do
-    [
-      {e,
-       quote do
-         assert is_tuple({unquote(e)})
-       end}
-    ]
+    {
+      :leaf,
+      quote do
+        assert is_tuple({unquote(e)})
+      end,
+      e
+    }
+  end
+
+  @spec extend(path_tree(), (L1Stm.ast(), L1Exp.ast() -> path_tree())) :: path_tree()
+  defp extend({:node, s, c, cs}, f) do
+    {:node, s, extend(c, f), Stream.map(cs, &extend(&1, f))}
+  end
+
+  defp extend({:leaf, s, e}, f) do
+    f.(s, e)
   end
 end

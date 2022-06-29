@@ -95,7 +95,7 @@ defmodule Boogiex do
   defmacro assume(env, ast, error_msg \\ nil) do
     error_msg =
       with nil <- error_msg do
-        Msg.assume_failed(ast)
+        Msg.to_string(Msg.assume_failed(ast))
       end
 
     quote do
@@ -117,7 +117,7 @@ defmodule Boogiex do
   defmacro assert(env, ast, error_msg \\ nil) do
     error_msg =
       with nil <- error_msg do
-        Msg.assert_failed(ast)
+        Msg.to_string(Msg.assert_failed(ast))
       end
 
     quote do
@@ -147,7 +147,7 @@ defmodule Boogiex do
         quote(do: push)
       )
 
-      unquote(body)
+      result = unquote(body)
 
       Boogiex.Lang.SmtLib.run(
         Env.connection(env),
@@ -156,6 +156,8 @@ defmodule Boogiex do
       )
 
       Env.update_tuple_constructor(env, tuple_constructor)
+
+      result
     end
   end
 

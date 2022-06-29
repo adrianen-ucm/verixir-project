@@ -2,38 +2,91 @@ defmodule Boogiex.Lang.L2Code do
   require Logger
   alias Boogiex.Msg
   alias Boogiex.Env
+  alias Boogiex.Lang.SmtLib
   alias Boogiex.Lang.L1Stm
   alias Boogiex.Lang.L2Exp
   alias Boogiex.Lang.L2Var
   alias Boogiex.UserDefined
   alias Boogiex.Error.EnvError
 
-  @spec verify(Env.t(), L2Exp.ast()) :: [term()]
+  @spec verify(Env.t(), L2Exp.ast()) :: Enumerable.t()
   def verify(env, e) do
     Logger.debug(Macro.to_string(e), language: :l2)
 
-    for {_, sem} <-
-          L2Exp.translate(
-            L2Var.ssa(
-              expand_specs(
-                expand_unfolds(
-                  e,
-                  Env.user_defined(env)
-                ),
-                Env.user_defined(env)
-              )
-            )
-          ) do
-      L1Stm.eval(
+    tuple_constructor = Env.tuple_constructor(env)
+
+    SmtLib.run(
+      Env.connection(env),
+      Msg.block_context(),
+      quote(do: push)
+    )
+
+    errors =
+      verify_rec(
         env,
-        quote do
-          block do
-            unquote(sem)
-          end
+        L2Exp.translate(
+          L2Var.ssa(
+            expand_specs(
+              expand_unfolds(
+                e,
+                Env.user_defined(env)
+              ),
+              Env.user_defined(env)
+            )
+          )
+        )
+      )
+      |> List.flatten()
+
+    SmtLib.run(
+      Env.connection(env),
+      Msg.block_context(),
+      quote(do: pop)
+    )
+
+    Env.update_tuple_constructor(env, tuple_constructor)
+
+    errors
+  end
+
+  @spec verify_rec(Env.t(), L2Exp.path_tree()) :: deep_error_list
+        when deep_error_list: [term() | deep_error_list]
+  def verify_rec(env, {:node, s, c, cs}) do
+    if Enum.empty?(cs) do
+      L1Stm.eval(env, s)
+      verify_rec(env, c)
+    else
+      L1Stm.eval(env, s)
+
+      Enum.map(
+        Enum.concat([c], cs),
+        fn c ->
+          tuple_constructor = Env.tuple_constructor(env)
+
+          SmtLib.run(
+            Env.connection(env),
+            Msg.block_context(),
+            quote(do: push)
+          )
+
+          errors = verify_rec(env, c)
+
+          SmtLib.run(
+            Env.connection(env),
+            Msg.block_context(),
+            quote(do: pop)
+          )
+
+          Env.update_tuple_constructor(env, tuple_constructor)
+
+          errors
         end
       )
     end
-    |> List.flatten()
+  end
+
+  def verify_rec(env, {:leaf, s, _}) do
+    L1Stm.eval(env, s)
   end
 
   @spec remove_ghost(L2Exp.ast()) :: L2Exp.ast()

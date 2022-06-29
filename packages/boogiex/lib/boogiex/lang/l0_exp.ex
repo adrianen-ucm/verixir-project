@@ -1,10 +1,11 @@
 defmodule Boogiex.Lang.L0Exp do
   require Logger
+  alias Boogiex.Msg
   alias Boogiex.Lang.SmtLib
 
   @type ast :: Macro.t()
 
-  @spec eval(SmtLib.connection(), SmtLib.context(), ast()) :: [term()]
+  @spec eval(SmtLib.connection(), Msg.t(), ast()) :: [term()]
   def eval(conn, context, e) do
     Logger.debug(Macro.to_string(e), language: :l0)
 
@@ -19,10 +20,10 @@ defmodule Boogiex.Lang.L0Exp do
     errors
   end
 
-  @spec eval_rec(SmtLib.connection(), SmtLib.context(), ast()) :: deep_error_list
+  @spec eval_rec(SmtLib.connection(), Msg.t(), ast()) :: deep_error_list
         when deep_error_list: [term() | deep_error_list]
   defp eval_rec(_, _, {:fail, _, [error]}) do
-    [error]
+    [Msg.to_string(error)]
   end
 
   defp eval_rec(conn, context, {:add, _, [f]}) do

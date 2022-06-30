@@ -3,6 +3,7 @@ defmodule Boogiex.Lang.L2Code do
   alias Boogiex.Msg
   alias Boogiex.Env
   alias Boogiex.Lang.SmtLib
+  alias Boogiex.Lang.L1Exp
   alias Boogiex.Lang.L1Stm
   alias Boogiex.Lang.L2Exp
   alias Boogiex.Lang.L2Var
@@ -34,7 +35,8 @@ defmodule Boogiex.Lang.L2Code do
               Env.user_defined(env)
             )
           )
-        )
+        ),
+        nil
       )
       |> List.flatten()
 
@@ -49,12 +51,13 @@ defmodule Boogiex.Lang.L2Code do
     errors
   end
 
-  @spec verify_rec(Env.t(), L2Exp.path_tree()) :: deep_error_list
-        when deep_error_list: [term() | deep_error_list]
-  def verify_rec(env, {:node, s, c, cs}) do
+  @spec verify_rec(Env.t(), L2Exp.path_tree(), then) :: deep_error_list
+        when deep_error_list: [term() | deep_error_list],
+             then: nil | (L1Exp.ast() -> L2Exp.path_tree())
+  def verify_rec(env, {:fork, s, c, cs}, then) do
     if Enum.empty?(cs) do
       L1Stm.eval(env, s)
-      verify_rec(env, c)
+      verify_rec(env, c, then)
     else
       L1Stm.eval(env, s)
 
@@ -69,7 +72,7 @@ defmodule Boogiex.Lang.L2Code do
             quote(do: push)
           )
 
-          errors = verify_rec(env, c)
+          errors = verify_rec(env, c, then)
 
           SmtLib.run(
             Env.connection(env),
@@ -85,8 +88,29 @@ defmodule Boogiex.Lang.L2Code do
     end
   end
 
-  def verify_rec(env, {:leaf, s, _}) do
+  def verify_rec(env, {:extend, c, f}, nil) do
+    verify_rec(env, c, f)
+  end
+
+  def verify_rec(env, {:extend, c, f}, then) do
+    verify_rec(env, c, fn t ->
+      {
+        :extend,
+        f.(t),
+        then
+      }
+    end)
+  end
+
+  def verify_rec(env, {:end, s, _}, nil) do
     L1Stm.eval(env, s)
+  end
+
+  def verify_rec(env, {:end, s, t}, then) do
+    [
+      L1Stm.eval(env, s),
+      verify_rec(env, then.(t), nil)
+    ]
   end
 
   @spec remove_ghost(L2Exp.ast()) :: L2Exp.ast()

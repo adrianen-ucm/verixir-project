@@ -8,23 +8,23 @@ defmodule Boogiex.Lang.L2Exp do
 
   @type ast :: Macro.t()
   @type path_tree() ::
-          {:leaf, L1Stm.ast(), L1Exp.ast()}
-          | {:node, L1Stm.ast(), path_tree(), Enumerable.t()}
+          {:end, L1Stm.ast(), L1Exp.ast()}
+          | {:fork, L1Stm.ast(), path_tree(), Enumerable.t()}
+          | {:extend, path_tree(), (L1Exp.ast() -> path_tree())}
 
   @spec translate(ast()) :: path_tree()
   def translate({:ghost, _, [[do: s]]}) do
-    {:leaf, s, []}
+    {:end, s, []}
   end
 
   def translate({:=, _, [p, e]}) do
-    extend(
+    {
+      :extend,
       translate(e),
-      fn sem, t ->
+      fn t ->
         {
-          :leaf,
+          :end,
           quote do
-            unquote_splicing([sem] |> Enum.reject(&is_nil/1))
-
             assert unquote(L2Match.translate(p, t)),
                    unquote(Msg.pattern_does_not_match(t, p))
 
@@ -42,12 +42,12 @@ defmodule Boogiex.Lang.L2Exp do
           t
         }
       end
-    )
+    }
   end
 
   def translate({:__block__, _, []}) do
     {
-      :leaf,
+      :end,
       quote do
       end,
       []
@@ -61,31 +61,26 @@ defmodule Boogiex.Lang.L2Exp do
   def translate({:__block__, _, [h | t] = es}) do
     case List.pop_at(es, -1) do
       {{:ghost, _, [[do: s]]}, es} ->
-        extend(
+        {
+          :extend,
           translate({:__block__, [], es}),
-          fn sem, t ->
+          fn t ->
             {
-              :leaf,
+              :end,
               quote do
-                (unquote_splicing([sem, s] |> Enum.reject(&is_nil/1)))
+                (unquote_splicing([s] |> Enum.reject(&is_nil/1)))
               end,
               t
             }
           end
-        )
+        }
 
       _ ->
-        extend(
+        {
+          :extend,
           translate(h),
-          fn h_sem, _ ->
-            {
-              :node,
-              h_sem,
-              translate({:__block__, [], t}),
-              []
-            }
-          end
-        )
+          fn _ -> translate({:__block__, [], t}) end
+        }
     end
   end
 
@@ -105,9 +100,10 @@ defmodule Boogiex.Lang.L2Exp do
   end
 
   def translate({:case, _, [e, [do: bs]]}) do
-    extend(
+    {
+      :extend,
       translate(e),
-      fn e_sem, e_t ->
+      fn e_t ->
         {all_pattern_vars, one_pattern_holds} =
           Enum.reduce(bs, {MapSet.new(), false}, fn {:->, _, [[b], _]}, {vs, acc} ->
             {pi, fi} =
@@ -140,7 +136,7 @@ defmodule Boogiex.Lang.L2Exp do
             {
               [
                 {
-                  :node,
+                  :fork,
                   quote do
                     assume unquote(previous_do_not_hold),
                            unquote(Msg.bad_previous_branch_to(pi, fi))
@@ -168,10 +164,8 @@ defmodule Boogiex.Lang.L2Exp do
           end)
 
         {
-          :node,
+          :fork,
           quote do
-            unquote_splicing([e_sem] |> Enum.reject(&is_nil/1))
-
             unquote_splicing(
               for var <- all_pattern_vars do
                 quote do
@@ -187,25 +181,16 @@ defmodule Boogiex.Lang.L2Exp do
           Stream.drop(stms, 1)
         }
       end
-    )
+    }
   end
 
   def translate(e) do
     {
-      :leaf,
+      :end,
       quote do
         assert is_tuple({unquote(e)})
       end,
       e
     }
-  end
-
-  @spec extend(path_tree(), (L1Stm.ast(), L1Exp.ast() -> path_tree())) :: path_tree()
-  defp extend({:node, s, c, cs}, f) do
-    {:node, s, extend(c, f), Stream.map(cs, &extend(&1, f))}
-  end
-
-  defp extend({:leaf, s, e}, f) do
-    f.(s, e)
   end
 end

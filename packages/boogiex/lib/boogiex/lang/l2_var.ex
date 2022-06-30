@@ -32,6 +32,17 @@ defmodule Boogiex.Lang.L2Var do
     }
   end
 
+  defp ssa_rec({:havoc, _, [{var_name, _, m} = var]}, state)
+       when is_atom(var_name) and is_atom(m) do
+    state = new_version_for_vars([var_name], state)
+    {var, state} = ssa_rec(var, state)
+
+    {
+      {:havoc, [], [var]},
+      state
+    }
+  end
+
   defp ssa_rec({:__block__, _, es}, state) do
     {es, state} = Enum.map_reduce(es, state, &ssa_rec/2)
 

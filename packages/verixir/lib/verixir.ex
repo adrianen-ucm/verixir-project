@@ -135,8 +135,6 @@ defmodule Verixir do
                  ))
               end
 
-              # Assume at least one pre holds, instead of trivial branch?
-
               unquote(
                 {:case, [],
                  [

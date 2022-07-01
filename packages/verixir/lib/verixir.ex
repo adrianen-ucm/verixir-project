@@ -37,6 +37,16 @@ defmodule Verixir do
 
   @spec defv(Macro.t(), do: Macro.t()) :: Macro.t()
   defmacro defv(ast, do: body) do
+    expand_function(ast, body, false)
+  end
+
+  @spec defvp(Macro.t(), do: Macro.t()) :: Macro.t()
+  defmacro defvp(ast, do: body) do
+    expand_function(ast, body, true)
+  end
+
+  @spec expand_function(Macro.t(), Macro.t(), boolean()) :: Macro.t()
+  defp expand_function(ast, body, private) do
     {name, args, guard} =
       case ast do
         {:when, _, [{name, _, args}, guard]} -> {name, args, guard}
@@ -87,8 +97,16 @@ defmodule Verixir do
         verification_functions
       )
 
-      def unquote(name)(unquote_splicing(args)) when unquote(guard) do
-        unquote(L2Code.remove_ghost(body))
+      private = unquote(private)
+
+      if private do
+        defp unquote(name)(unquote_splicing(args)) when unquote(guard) do
+          unquote(L2Code.remove_ghost(body))
+        end
+      else
+        def unquote(name)(unquote_splicing(args)) when unquote(guard) do
+          unquote(L2Code.remove_ghost(body))
+        end
       end
     end
   end
@@ -121,50 +139,48 @@ defmodule Verixir do
 
         fresh_vars = Macro.generate_arguments(arity, nil)
 
-        errors =
-          L2Code.verify(
-            env,
-            quote do
-              ghost do
-                (unquote_splicing(
-                   for v <- fresh_vars do
-                     quote do
-                       havoc(unquote(v))
-                     end
+        L2Code.verify(
+          env,
+          quote do
+            ghost do
+              (unquote_splicing(
+                 for v <- fresh_vars do
+                   quote do
+                     havoc(unquote(v))
                    end
-                 ))
-              end
-
-              unquote(
-                {:case, [],
-                 [
-                   quote(do: {unquote_splicing(fresh_vars)}),
-                   [
-                     do:
-                       List.flatten([
-                         for d <- defs do
-                           quote do
-                             {unquote_splicing(d.args)}
-                             when unquote(d.pre) ->
-                               res = unquote(d.body)
-
-                               ghost do
-                                 assume res === unquote(name)(unquote_splicing(fresh_vars))
-                                 assert unquote(d.post)
-                               end
-                           end
-                         end,
-                         quote do
-                           {unquote_splicing(fresh_vars)} -> true
-                         end
-                       ])
-                   ]
-                 ]}
-              )
+                 end
+               ))
             end
-          )
 
-        Enum.each(errors, &IO.warn/1)
+            unquote(
+              {:case, [],
+               [
+                 quote(do: {unquote_splicing(fresh_vars)}),
+                 [
+                   do:
+                     List.flatten([
+                       for d <- defs do
+                         quote do
+                           {unquote_splicing(d.args)}
+                           when unquote(d.pre) ->
+                             res = unquote(d.body)
+
+                             ghost do
+                               assume res === unquote(name)(unquote_splicing(fresh_vars))
+                               assert unquote(d.post)
+                             end
+                         end
+                       end,
+                       quote do
+                         {unquote_splicing(fresh_vars)} -> true
+                       end
+                     ])
+                 ]
+               ]}
+            )
+          end
+        )
+
         Boogiex.Env.clear(env)
       end
     end

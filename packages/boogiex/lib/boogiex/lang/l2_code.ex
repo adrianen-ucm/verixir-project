@@ -22,23 +22,21 @@ defmodule Boogiex.Lang.L2Code do
       quote(do: push)
     )
 
-    errors =
-      verify_rec(
-        env,
-        L2Exp.translate(
-          L2Var.ssa(
-            expand_specs(
-              expand_unfolds(
-                e,
-                Env.user_defined(env)
-              ),
+    verify_rec(
+      env,
+      L2Exp.translate(
+        L2Var.ssa(
+          expand_specs(
+            expand_unfolds(
+              e,
               Env.user_defined(env)
-            )
+            ),
+            Env.user_defined(env)
           )
-        ),
-        nil
-      )
-      |> List.flatten()
+        )
+      ),
+      nil
+    )
 
     SmtLib.run(
       Env.connection(env),
@@ -47,13 +45,10 @@ defmodule Boogiex.Lang.L2Code do
     )
 
     Env.update_tuple_constructor(env, tuple_constructor)
-
-    errors
   end
 
-  @spec verify_rec(Env.t(), L2Exp.path_tree(), then) :: deep_error_list
-        when deep_error_list: [term() | deep_error_list],
-             then: nil | (L1Exp.ast() -> L2Exp.path_tree())
+  @spec verify_rec(Env.t(), L2Exp.path_tree(), then) :: any()
+        when then: nil | (L1Exp.ast() -> L2Exp.path_tree())
   def verify_rec(env, {:fork, s, c, cs}, then) do
     if Enum.empty?(cs) do
       L1Stm.eval(env, s)
@@ -61,7 +56,7 @@ defmodule Boogiex.Lang.L2Code do
     else
       L1Stm.eval(env, s)
 
-      Enum.map(
+      Enum.each(
         Enum.concat([c], cs),
         fn c ->
           tuple_constructor = Env.tuple_constructor(env)
@@ -72,7 +67,7 @@ defmodule Boogiex.Lang.L2Code do
             quote(do: push)
           )
 
-          errors = verify_rec(env, c, then)
+          verify_rec(env, c, then)
 
           SmtLib.run(
             Env.connection(env),
@@ -81,8 +76,6 @@ defmodule Boogiex.Lang.L2Code do
           )
 
           Env.update_tuple_constructor(env, tuple_constructor)
-
-          errors
         end
       )
     end
@@ -107,10 +100,8 @@ defmodule Boogiex.Lang.L2Code do
   end
 
   def verify_rec(env, {:end, s, t}, then) do
-    [
-      L1Stm.eval(env, s),
-      verify_rec(env, then.(t), nil)
-    ]
+    L1Stm.eval(env, s)
+    verify_rec(env, then.(t), nil)
   end
 
   @spec remove_ghost(L2Exp.ast()) :: L2Exp.ast()

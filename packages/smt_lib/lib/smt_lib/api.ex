@@ -36,11 +36,23 @@ defmodule SmtLib.API do
               {:ok, r}
 
             {:error, r} ->
-              Logger.error("SMT-LIB #{r}", language: :smtlib)
+              Logger.error("SMT-LIB #{case String.Chars.impl_for(r) do
+                nil -> inspect(r)
+                _ -> to_string(r)
+              end}",
+                language: :smtlib
+              )
+
               {:error, r}
 
             other ->
-              Logger.error("SMT-LIB #{other}", language: :smtlib)
+              Logger.error("SMT-LIB #{case String.Chars.impl_for(other) do
+                nil -> inspect(other)
+                _ -> to_string(other)
+              end}",
+                language: :smtlib
+              )
+
               {:error, other}
           end
         end

@@ -3,7 +3,7 @@ defmodule Fib do
 
   @verifier requires is_integer(n)
   @verifier ensures is_integer(fib(n))
-  defvp fib(n) when n >= 0 do
+  defvg fib(n) when n >= 0 do
     case n do
       0 -> 0
       1 -> 1

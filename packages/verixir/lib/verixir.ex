@@ -2,6 +2,8 @@ defmodule Verixir do
   alias Boogiex.Lang.L2Code
   alias Boogiex.UserDefined.Function
 
+  @typep def_kind :: :ghost | :private | :public
+
   @spec __using__([]) :: Macro.t()
   defmacro __using__(_) do
     quote do
@@ -37,16 +39,21 @@ defmodule Verixir do
 
   @spec defv(Macro.t(), do: Macro.t()) :: Macro.t()
   defmacro defv(ast, do: body) do
-    expand_function(ast, body, false)
+    expand_function(ast, body, :public)
   end
 
   @spec defvp(Macro.t(), do: Macro.t()) :: Macro.t()
   defmacro defvp(ast, do: body) do
-    expand_function(ast, body, true)
+    expand_function(ast, body, :private)
   end
 
-  @spec expand_function(Macro.t(), Macro.t(), boolean()) :: Macro.t()
-  defp expand_function(ast, body, private) do
+  @spec defvg(Macro.t(), do: Macro.t()) :: Macro.t()
+  defmacro defvg(ast, do: body) do
+    expand_function(ast, body, :ghost)
+  end
+
+  @spec expand_function(Macro.t(), Macro.t(), def_kind()) :: Macro.t()
+  defp expand_function(ast, body, kind) do
     {name, args, guard} =
       case ast do
         {:when, _, [{name, _, args}, guard]} -> {name, args, guard}
@@ -97,16 +104,21 @@ defmodule Verixir do
         verification_functions
       )
 
-      private = unquote(private)
+      kind = unquote(kind)
 
-      if private do
-        defp unquote(name)(unquote_splicing(args)) when unquote(guard) do
-          unquote(L2Code.remove_ghost(body))
-        end
-      else
-        def unquote(name)(unquote_splicing(args)) when unquote(guard) do
-          unquote(L2Code.remove_ghost(body))
-        end
+      case kind do
+        :public ->
+          def unquote(name)(unquote_splicing(args)) when unquote(guard) do
+            unquote(L2Code.remove_ghost(body))
+          end
+
+        :private ->
+          defp unquote(name)(unquote_splicing(args)) when unquote(guard) do
+            unquote(L2Code.remove_ghost(body))
+          end
+
+        :ghost ->
+          nil
       end
     end
   end

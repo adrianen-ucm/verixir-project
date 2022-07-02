@@ -24,7 +24,7 @@ defmodule Boogiex.Lang.L0Exp do
   @spec eval_rec(SmtLib.connection(), Msg.t(), ast(), deep_error_list()) ::
           deep_error_list()
   defp eval_rec(_, _, {:fail, _, [error]}, []) do
-    Msg.to_string(error)
+    [Msg.to_string(error)]
   end
 
   defp eval_rec(conn, context, {:fail, _, [_]} = ast, errors) do

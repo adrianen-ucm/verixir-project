@@ -1,6 +1,9 @@
 defmodule Verixir do
+  alias Boogiex.Env
   alias Boogiex.Lang.L2Code
   alias Boogiex.UserDefined.Function
+  alias Boogiex.BuiltIn.TupleConstructor
+  alias SmtLib.Connection.Z3, as: Connection
 
   @typep def_kind :: :ghost | :private | :public
 
@@ -104,22 +107,26 @@ defmodule Verixir do
         verification_functions
       )
 
-      kind = unquote(kind)
+      unquote(
+        case kind do
+          :public ->
+            quote do
+              def unquote(name)(unquote_splicing(args)) when unquote(guard) do
+                unquote(L2Code.remove_ghost(body))
+              end
+            end
 
-      case kind do
-        :public ->
-          def unquote(name)(unquote_splicing(args)) when unquote(guard) do
-            unquote(L2Code.remove_ghost(body))
-          end
+          :private ->
+            quote do
+              defp unquote(name)(unquote_splicing(args)) when unquote(guard) do
+                unquote(L2Code.remove_ghost(body))
+              end
+            end
 
-        :private ->
-          defp unquote(name)(unquote_splicing(args)) when unquote(guard) do
-            unquote(L2Code.remove_ghost(body))
-          end
-
-        :ghost ->
-          nil
-      end
+          :ghost ->
+            nil
+        end
+      )
     end
   end
 
@@ -134,20 +141,26 @@ defmodule Verixir do
                ) do
           %{}
         end
-
-      verification_functions =
-        Map.new(verification_functions, fn {k, defs} ->
+        |> Map.new(fn {k, defs} ->
           {k, Enum.reverse(defs)}
         end)
 
+      env =
+        Env.new(
+          Connection.new(),
+          functions: verification_functions
+        )
+
+      Env.update_tuple_constructor(
+        env,
+        Enum.reduce(0..10, Env.tuple_constructor(env), fn n, t ->
+          TupleConstructor.get(t, n)
+          |> elem(1)
+        end)
+      )
+
       for {{name, arity}, defs} <- verification_functions do
         IO.puts("Verifying #{name}/#{arity}")
-
-        env =
-          Boogiex.Env.new(
-            SmtLib.Connection.Z3.new(),
-            functions: verification_functions
-          )
 
         fresh_vars = Macro.generate_arguments(arity, nil)
 
@@ -192,9 +205,9 @@ defmodule Verixir do
             )
           end
         )
-
-        Boogiex.Env.clear(env)
       end
+
+      Env.clear(env)
     end
   end
 end

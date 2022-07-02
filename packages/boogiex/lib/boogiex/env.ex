@@ -91,13 +91,17 @@ defmodule Boogiex.Env do
         end
       )
 
-    for {n, const} <- diff do
-      SmtLib.run(
-        connection(env),
-        Msg.tuple_constructor_context(const),
-        BuiltIn.declare_function(const, n)
-      )
-    end
+    SmtLib.run(
+      connection(env),
+      Msg.tuple_constructor_context(diff),
+      quote do
+        (unquote_splicing(
+           Enum.map(diff, fn {n, const} ->
+             BuiltIn.declare_function(const, n)
+           end)
+         ))
+      end
+    )
 
     :ok
   end

@@ -79,9 +79,9 @@ defmodule Boogiex.Msg do
     fn -> "declaring the user defined functions" end
   end
 
-  @spec tuple_constructor_context(atom()) :: t()
-  def tuple_constructor_context(name) do
-    fn -> "declaring the tuple constructor #{name}" end
+  @spec tuple_constructor_context(any()) :: t()
+  def tuple_constructor_context(cs) do
+    fn -> "declaring the tuple constructor(s) #{inspect(cs)}" end
   end
 
   @spec could_not_start_tuple_constructor(any()) :: t()

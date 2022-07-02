@@ -3,14 +3,17 @@ defmodule Boogiex.Lang.L2Var do
   alias Boogiex.Msg
   alias Boogiex.Lang.L2Exp
 
-  @typep state :: any()
+  @typep ssa_state :: {
+           %{atom() => non_neg_integer()},
+           %{atom() => [non_neg_integer()]}
+         }
 
   @spec ssa(L2Exp.ast()) :: L2Exp.ast()
   def ssa(e) do
     ssa_rec(e, {%{}, %{}}) |> elem(0)
   end
 
-  @spec ssa_rec(L2Exp.ast(), state()) :: {L2Exp.ast(), state()}
+  @spec ssa_rec(L2Exp.ast(), ssa_state()) :: {L2Exp.ast(), ssa_state()}
   defp ssa_rec({var_name, _, m} = ast, {_, version_stack} = state)
        when is_atom(var_name) and is_atom(m) do
     case version_stack[var_name] do
@@ -159,7 +162,7 @@ defmodule Boogiex.Lang.L2Var do
     |> elem(1)
   end
 
-  @spec new_version_for_vars(Enumerable.t(), state()) :: state()
+  @spec new_version_for_vars(Enumerable.t(), ssa_state()) :: ssa_state()
   defp new_version_for_vars(var_names, state) do
     Enum.reduce(
       var_names,

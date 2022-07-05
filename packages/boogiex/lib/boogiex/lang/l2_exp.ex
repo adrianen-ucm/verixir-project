@@ -58,12 +58,12 @@ defmodule Boogiex.Lang.L2Exp do
     translate(e)
   end
 
-  def translate({:__block__, _, [h | t] = es}) do
+  def translate({:__block__, mt, [h | t] = es}) do
     case List.pop_at(es, -1) do
       {{:ghost, _, [[do: s]]}, es} ->
         {
           :extend,
-          translate({:__block__, [], es}),
+          translate({:__block__, mt, es}),
           fn t ->
             {
               :end,
@@ -79,7 +79,7 @@ defmodule Boogiex.Lang.L2Exp do
         {
           :extend,
           translate(h),
-          fn _ -> translate({:__block__, [], t}) end
+          fn _ -> translate({:__block__, mt, t}) end
         }
     end
   end
@@ -99,7 +99,9 @@ defmodule Boogiex.Lang.L2Exp do
     )
   end
 
-  def translate({:case, _, [e, [do: bs]]}) do
+  def translate({:case, mt, [e, [do: bs]]}) do
+    msg = Keyword.get(mt, :msg, Msg.no_case_pattern_holds_for(e))
+
     {
       :extend,
       translate(e),
@@ -175,7 +177,7 @@ defmodule Boogiex.Lang.L2Exp do
             )
 
             assert unquote(one_pattern_holds),
-                   unquote(Msg.no_case_pattern_holds_for(e))
+                   unquote(msg)
           end,
           Enum.at(stms, 0),
           Stream.drop(stms, 1)

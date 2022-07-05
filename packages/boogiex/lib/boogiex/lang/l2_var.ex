@@ -26,47 +26,47 @@ defmodule Boogiex.Lang.L2Var do
     end
   end
 
-  defp ssa_rec({:ghost, _, [[do: s]]}, state) do
+  defp ssa_rec({:ghost, mt, [[do: s]]}, state) do
     {s, state} = ssa_rec(s, state)
 
     {
-      {:ghost, [], [[do: s]]},
+      {:ghost, mt, [[do: s]]},
       state
     }
   end
 
-  defp ssa_rec({:havoc, _, [{var_name, _, m} = var]}, state)
+  defp ssa_rec({:havoc, mt, [{var_name, _, m} = var]}, state)
        when is_atom(var_name) and is_atom(m) do
     state = new_version_for_vars([var_name], state)
     {var, state} = ssa_rec(var, state)
 
     {
-      {:havoc, [], [var]},
+      {:havoc, mt, [var]},
       state
     }
   end
 
-  defp ssa_rec({:__block__, _, es}, state) do
+  defp ssa_rec({:__block__, mt, es}, state) do
     {es, state} = Enum.map_reduce(es, state, &ssa_rec/2)
 
     {
-      {:__block__, [], es},
+      {:__block__, mt, es},
       state
     }
   end
 
-  defp ssa_rec({:=, _, [p, e]}, state) do
+  defp ssa_rec({:=, mt, [p, e]}, state) do
     {e, state} = ssa_rec(e, state)
     state = new_version_for_vars(var_names(p), state)
     {p, state} = ssa_rec(p, state)
 
     {
-      {:=, [], [p, e]},
+      {:=, mt, [p, e]},
       state
     }
   end
 
-  defp ssa_rec({:->, _, [[b], e]}, state) do
+  defp ssa_rec({:->, mt, [[b], e]}, state) do
     {p, f} =
       case b do
         {:when, [], [p, f]} -> {p, f}
@@ -95,22 +95,22 @@ defmodule Boogiex.Lang.L2Var do
       )
 
     {
-      {:->, [], [[{:when, [], [p, f]}], e]},
+      {:->, mt, [[{:when, [], [p, f]}], e]},
       {max_version, version_stack}
     }
   end
 
-  defp ssa_rec({:case, _, [e, [do: bs]]}, state) do
+  defp ssa_rec({:case, mt, [e, [do: bs]]}, state) do
     {e, state} = ssa_rec(e, state)
     {bs, state} = Enum.map_reduce(bs, state, &ssa_rec/2)
 
     {
-      {:case, [], [e, [do: bs]]},
+      {:case, mt, [e, [do: bs]]},
       state
     }
   end
 
-  defp ssa_rec({:if, _, [e, kw]}, state) do
+  defp ssa_rec({:if, mt, [e, kw]}, state) do
     empty =
       quote do
       end
@@ -120,7 +120,7 @@ defmodule Boogiex.Lang.L2Var do
     {e_else, state} = ssa_rec(Keyword.get(kw, :else, empty), state)
 
     {
-      {:if, [], [e, [do: e_do, else: e_else]]},
+      {:if, mt, [e, [do: e_do, else: e_else]]},
       state
     }
   end

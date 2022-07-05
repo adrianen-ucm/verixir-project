@@ -138,7 +138,7 @@ defmodule Boogiex.Lang.L2Code do
                 message: Msg.undefined_user_defined_function(f, args)
             end
 
-          {:case, [],
+          {:case, [msg: Msg.no_precondition_holds(f, args)],
            [
              quote(do: {unquote_splicing(args)}),
              [
@@ -171,33 +171,33 @@ defmodule Boogiex.Lang.L2Code do
     ast
   end
 
-  def expand_specs({:=, _, [p, e]}, user_defined) do
-    {:=, [], [p, expand_specs(e, user_defined)]}
+  def expand_specs({:=, mt, [p, e]}, user_defined) do
+    {:=, mt, [p, expand_specs(e, user_defined)]}
   end
 
-  def expand_specs({:__block__, _, es}, user_defined) do
-    {:__block__, [], Enum.map(es, &expand_specs(&1, user_defined))}
+  def expand_specs({:__block__, mt, es}, user_defined) do
+    {:__block__, mt, Enum.map(es, &expand_specs(&1, user_defined))}
   end
 
-  def expand_specs({:case, _, [e, [do: bs]]}, user_defined) do
-    {:case, [],
+  def expand_specs({:case, mt, [e, [do: bs]]}, user_defined) do
+    {:case, mt,
      [
        expand_specs(e, user_defined),
        [
          do:
-           Enum.map(bs, fn {:->, _, [[b], e]} ->
-             {:->, [], [[b], expand_specs(e, user_defined)]}
+           Enum.map(bs, fn {:->, mt, [[b], e]} ->
+             {:->, mt, [[b], expand_specs(e, user_defined)]}
            end)
        ]
      ]}
   end
 
-  def expand_specs({:if, _, [e, kw]}, user_defined) do
+  def expand_specs({:if, mt, [e, kw]}, user_defined) do
     empty =
       quote do
       end
 
-    {:if, [],
+    {:if, mt,
      [
        expand_specs(e, user_defined),
        [
@@ -216,7 +216,7 @@ defmodule Boogiex.Lang.L2Code do
           {f, _, args} = ast, calls when is_list(args) ->
             case UserDefined.function_defs(user_defined, f, length(args)) do
               nil -> {ast, calls}
-              defs -> {ast, [{defs, args} | calls]}
+              defs -> {ast, [{f, args, defs} | calls]}
             end
 
           other, calls ->
@@ -226,8 +226,8 @@ defmodule Boogiex.Lang.L2Code do
 
     quote do
       unquote_splicing(
-        for {defs, args} <- calls do
-          {:case, [],
+        for {f, args, defs} <- calls do
+          {:case, [msg: Msg.no_precondition_holds(f, args)],
            [
              quote(do: {unquote_splicing(args)}),
              [

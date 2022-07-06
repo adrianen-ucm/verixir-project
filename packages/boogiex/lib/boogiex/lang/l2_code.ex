@@ -95,8 +95,15 @@ defmodule Boogiex.Lang.L2Code do
     end)
   end
 
-  def verify_rec(env, {:end, s, _}, nil) do
+  def verify_rec(env, {:end, s, t}, nil) do
     L1Stm.eval(env, s)
+
+    L1Stm.eval(
+      env,
+      quote do
+        assert is_tuple({unquote(t)})
+      end
+    )
   end
 
   def verify_rec(env, {:end, s, t}, then) do

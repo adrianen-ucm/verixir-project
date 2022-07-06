@@ -79,7 +79,16 @@ defmodule Boogiex.Lang.L2Exp do
         {
           :extend,
           translate(h),
-          fn _ -> translate({:__block__, mt, t}) end
+          fn h_t ->
+            {
+              :fork,
+              quote do
+                assert is_tuple({unquote(h_t)})
+              end,
+              translate({:__block__, mt, t}),
+              []
+            }
+          end
         }
     end
   end
@@ -190,7 +199,6 @@ defmodule Boogiex.Lang.L2Exp do
     {
       :end,
       quote do
-        assert is_tuple({unquote(e)})
       end,
       e
     }

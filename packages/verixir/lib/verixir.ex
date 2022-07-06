@@ -197,7 +197,10 @@ defmodule Verixir do
                          end
                        end,
                        quote do
-                         {unquote_splicing(fresh_vars)} -> true
+                         {unquote_splicing(fresh_vars)} ->
+                           ghost do
+                             assume false
+                           end
                        end
                      ])
                  ]
